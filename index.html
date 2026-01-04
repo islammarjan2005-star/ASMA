@@ -1,17 +1,1395 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪶</text></svg>" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#059669" />
-    <meta name="description" content="Asma - A safe space for Muslim women to understand their faith with clarity and compassion" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <title>Asma - Islamic Companion</title>
-  </head>
-  <body class="bg-neutral-50">
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#059669">
+  <meta name="description" content="Asma - A safe space for Muslim women to understand their faith">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Asma - Islamic Companion</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { arabic: ['Amiri', 'serif'] }
+        }
+      }
+    }
+  </script>
+  <style>
+    html { -webkit-tap-highlight-color: transparent; }
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; }
+    .dark body { background: #171717; color: #f5f5f5; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0); }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+    .animate-slide-up { animation: slideUp 0.3s ease-out; }
+  </style>
+</head>
+<body class="bg-neutral-50">
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useContext, createContext, useReducer, useRef, useMemo } = React;
+
+    // ============================================
+    // ICONS (using Lucide)
+    // ============================================
+    const Icon = ({ name, className = "w-5 h-5", fill = false }) => {
+      const ref = useRef(null);
+      useEffect(() => {
+        if (ref.current && lucide[name]) {
+          ref.current.innerHTML = '';
+          const svg = lucide.createElement(lucide[name]);
+          svg.classList.add(...className.split(' '));
+          if (fill) svg.style.fill = 'currentColor';
+          ref.current.appendChild(svg);
+        }
+      }, [name, className, fill]);
+      return <span ref={ref} className="inline-flex items-center justify-center" />;
+    };
+
+    // ============================================
+    // DATA
+    // ============================================
+    const hadithDatabase = [
+      {
+        id: 1, topic: 'marriage',
+        arabic: 'لَا تُنْكَحُ الأَيِّمُ حَتَّى تُسْتَأْمَرَ',
+        text: 'A woman should not be married until she is consulted, and a virgin should not be married until her permission is sought.',
+        source: 'Sahih al-Bukhari 5136', authenticity: 'Sahih', narrator: 'Abu Hurairah',
+        context: 'The Prophet ﷺ emphasized that a woman\'s consent is essential and non-negotiable in marriage.',
+        doesMean: 'You have the absolute right to accept or reject any marriage proposal. Your voice matters.',
+        doesNotMean: 'This does not prevent families from suggesting matches—it means the final decision is yours alone.',
+        scholarly: 'All four schools of thought agree on the necessity of consent.'
+      },
+      {
+        id: 2, topic: 'worship',
+        arabic: 'إِنَّ هَذَا أَمْرٌ كَتَبَهُ اللَّهُ عَلَى بَنَاتِ آدَمَ',
+        text: 'This is something that Allah has ordained for the daughters of Adam.',
+        source: 'Sahih al-Bukhari 294', authenticity: 'Sahih', narrator: 'Aisha',
+        context: 'When Aisha was distressed about her period during Hajj, the Prophet ﷺ spoke these comforting words.',
+        doesMean: 'Menstruation is natural, not shameful. The exemption from prayer is a mercy, not a punishment.',
+        doesNotMean: 'This does not mean women are spiritually inferior. You can still make dhikr, dua, and connect with Allah.',
+        scholarly: 'Dr. Haifaa Younis speaks extensively on reclaiming this understanding.'
+      },
+      {
+        id: 3, topic: 'self-worth',
+        arabic: 'إِنَّ اللَّهَ لَا يَنْظُرُ إِلَى صُوَرِكُمْ',
+        text: 'Allah does not look at your appearance or wealth, but He looks at your hearts and actions.',
+        source: 'Sahih Muslim 2564', authenticity: 'Sahih', narrator: 'Abu Hurairah',
+        context: 'The Prophet ﷺ reminded us that Allah\'s measure of worth is entirely different from worldly standards.',
+        doesMean: 'Your value is defined by your character and sincerity—not appearance, status, or achievements.',
+        doesNotMean: 'This is not against self-care. It simply means these things are not the measure of your soul.',
+        scholarly: 'Ustadha Maryam Amir frequently references this in discussions on self-worth.'
+      },
+      {
+        id: 4, topic: 'balance',
+        arabic: 'إِنَّ لِنَفْسِكَ عَلَيْكَ حَقًّا',
+        text: 'Your own self has a right over you.',
+        source: 'Sahih al-Bukhari 1975', authenticity: 'Sahih', narrator: 'Abu Juhayfah',
+        context: 'A companion was overexerting himself in worship. The Prophet ﷺ taught the importance of balance.',
+        doesMean: 'Rest, self-care, and balance are part of faith. Taking care of yourself is an act of worship.',
+        doesNotMean: 'This does not excuse negligence—but burnout is not piety, and rest is not weakness.',
+        scholarly: 'Dr. Rania Awaad discusses this hadith in the context of mental health.'
+      },
+      {
+        id: 5, topic: 'divorce',
+        arabic: 'أَبْغَضُ الْحَلَالِ إِلَى اللَّهِ الطَّلَاقُ',
+        text: 'The most disliked of permissible things to Allah is divorce.',
+        source: 'Sunan Abu Dawud 2178', authenticity: 'Hasan', narrator: 'Ibn Umar',
+        context: 'Divorce is permitted in Islam. This hadith emphasizes it should not be taken lightly—not that it is forbidden.',
+        doesMean: 'Divorce is a valid, permissible exit from a harmful marriage. Islam does not trap you.',
+        doesNotMean: 'This should never be used to keep women in abusive situations. Your safety comes first.',
+        scholarly: 'Ustadha Zaynab Ansari emphasizes this hadith should never be weaponized against women.'
+      },
+      {
+        id: 6, topic: 'grief',
+        arabic: 'إِنَّ الْعَيْنَ تَدْمَعُ وَالْقَلْبَ يَحْزَنُ',
+        text: 'The eyes shed tears and the heart grieves, but we say only what pleases our Lord.',
+        source: 'Sahih al-Bukhari 1303', authenticity: 'Sahih', narrator: 'Anas ibn Malik',
+        context: 'The Prophet ﷺ said this when his son Ibrahim died. He wept openly, modeling healthy grief.',
+        doesMean: 'Crying and feeling deep sadness is human and completely allowed. The Prophet ﷺ himself grieved.',
+        doesNotMean: 'Tears are not weakness or lack of faith. You can grieve deeply while trusting Allah.',
+        scholarly: 'Ustadha Yasmin Mogahed speaks on this as permission to feel while maintaining hope.'
+      },
+      {
+        id: 7, topic: 'motherhood',
+        arabic: 'الْجَنَّةُ تَحْتَ أَقْدَامِ الأُمَّهَاتِ',
+        text: 'Paradise lies beneath the feet of mothers.',
+        source: 'Sunan an-Nasa\'i 3104', authenticity: 'Hasan', narrator: 'Mu\'awiyah ibn Jahima',
+        context: 'A man wanted to go for jihad. The Prophet ﷺ told him to stay and serve his mother instead.',
+        doesMean: 'Mothers hold immense honor in Islam. Serving your mother is among the greatest acts of worship.',
+        doesNotMean: 'This honors your sacrifice—it does not demand perfection or place unrealistic burdens on mothers.',
+        scholarly: 'Dr. Ingrid Mattson discusses how this should empower mothers, not exhaust them.'
+      },
+      {
+        id: 8, topic: 'dignity',
+        arabic: 'الْحَيَاءُ مِنَ الْإِيمَانِ',
+        text: 'Modesty is part of faith.',
+        source: 'Sahih al-Bukhari 9', authenticity: 'Sahih', narrator: 'Abu Hurairah',
+        context: 'Haya refers to an inner quality of conscience, dignity, and God-consciousness.',
+        doesMean: 'Haya is about character: humility, dignity, and awareness of Allah. It applies equally to everyone.',
+        doesNotMean: 'This is not exclusively about women\'s clothing. Haya is empowerment through dignity.',
+        scholarly: 'Dr. Tamara Gray emphasizes that haya is about inner strength and self-respect.'
+      },
+      {
+        id: 9, topic: 'marriage',
+        arabic: 'خَيْرُكُمْ خَيْرُكُمْ لِأَهْلِهِ',
+        text: 'The best of you are those who are best to their families.',
+        source: 'Sunan al-Tirmidhi 3895', authenticity: 'Sahih', narrator: 'Aisha',
+        context: 'The Prophet ﷺ set the standard for how spouses should treat each other.',
+        doesMean: 'A good Muslim is measured by how they treat their family. Kindness at home is the true test.',
+        doesNotMean: 'This is not just advice—it sets a standard. Mistreatment at home contradicts faith.',
+        scholarly: 'Dr. Ingrid Mattson emphasizes this hadith when discussing marital rights.'
+      },
+      {
+        id: 10, topic: 'self-worth',
+        arabic: 'كُلُّ ابْنِ آدَمَ خَطَّاءٌ وَخَيْرُ الْخَطَّائِينَ التَّوَّابُونَ',
+        text: 'Every son of Adam sins, and the best of sinners are those who repent.',
+        source: 'Sunan al-Tirmidhi 2499', authenticity: 'Hasan', narrator: 'Anas ibn Malik',
+        context: 'The Prophet ﷺ acknowledged human imperfection while pointing to the path forward.',
+        doesMean: 'Mistakes are part of being human. What defines you is not your fall, but your return to Allah.',
+        doesNotMean: 'This is not permission to sin—but it is hope for those who have. Your past does not define you.',
+        scholarly: 'Ustadha Yasmin Mogahed\'s "Reclaim Your Heart" centers on this teaching.'
+      },
+      {
+        id: 11, topic: 'balance',
+        arabic: 'يَسِّرُوا وَلاَ تُعَسِّرُوا',
+        text: 'Make things easy, and do not make them difficult.',
+        source: 'Sahih al-Bukhari 69', authenticity: 'Sahih', narrator: 'Anas ibn Malik',
+        context: 'The Prophet ﷺ gave this guidance to teachers and leaders—ease is the default in Islam.',
+        doesMean: 'Islam is meant to be livable. If your practice feels suffocating, something may need adjustment.',
+        doesNotMean: 'This doesn\'t mean avoiding all difficulty—but unnecessary hardship is not holiness.',
+        scholarly: 'Dr. Ingrid Mattson emphasizes this principle for practical fiqh.'
+      },
+      {
+        id: 12, topic: 'grief',
+        arabic: 'مَا يُصِيبُ الْمُسْلِمَ مِنْ نَصَبٍ وَلَا وَصَبٍ',
+        text: 'No fatigue, illness, anxiety, or distress befalls a Muslim except that Allah expiates some of their sins.',
+        source: 'Sahih al-Bukhari 5641', authenticity: 'Sahih', narrator: 'Abu Sa\'id al-Khudri',
+        context: 'The Prophet ﷺ gave meaning to suffering, even the smallest discomfort.',
+        doesMean: 'Your pain is not pointless. Every hardship, even tiny ones, carries spiritual reward.',
+        doesNotMean: 'This is not about seeking suffering—it\'s comfort when suffering comes.',
+        scholarly: 'This hadith is central to Islamic discussions on finding meaning in hardship.'
+      },
+    ];
+
+    const topics = [
+      { id: 'marriage', name: 'Marriage & Consent', icon: 'Circle', description: 'Your voice matters' },
+      { id: 'worship', name: 'Body & Worship', icon: 'Moon', description: 'Natural, not shameful' },
+      { id: 'self-worth', name: 'Self-Worth', icon: 'Star', description: 'You are enough' },
+      { id: 'balance', name: 'Rest & Balance', icon: 'Coffee', description: 'Self-care is faith' },
+      { id: 'divorce', name: 'Divorce & Rights', icon: 'Scale', description: 'Permission to leave' },
+      { id: 'grief', name: 'Grief & Loss', icon: 'CloudRain', description: 'Feel without guilt' },
+      { id: 'motherhood', name: 'Motherhood', icon: 'Heart', description: 'Honor without burden' },
+      { id: 'dignity', name: 'Modesty & Dignity', icon: 'Shield', description: 'Inner strength' },
+    ];
+
+    const quranicVerses = [
+      {
+        id: 1, category: 'comfort',
+        arabic: 'فَإِنَّ مَعَ الْعُسْرِ يُسْرًا ۝ إِنَّ مَعَ الْعُسْرِ يُسْرًا',
+        translation: 'For indeed, with hardship comes ease. Indeed, with hardship comes ease.',
+        reference: 'Surah Ash-Sharh (94:5-6)', theme: 'Hope in Hardship',
+        tafsir: 'Allah repeats this promise twice for emphasis. Notice it says "with" hardship, not "after"—ease is present even in the midst of struggle.',
+        reflection: 'When you feel overwhelmed, remember that relief is already on its way.'
+      },
+      {
+        id: 2, category: 'comfort',
+        arabic: 'وَلَسَوْفَ يُعْطِيكَ رَبُّكَ فَتَرْضَىٰ',
+        translation: 'And your Lord will give you, and you will be satisfied.',
+        reference: 'Surah Ad-Duha (93:5)', theme: 'Divine Promise',
+        tafsir: 'Allah promised complete satisfaction—not partial. If Allah promises to satisfy you, He knows exactly what you need.',
+        reflection: 'Whatever you\'re waiting for—healing, provision, love, peace—Allah has promised satisfaction.'
+      },
+      {
+        id: 3, category: 'mercy',
+        arabic: 'قُلْ يَا عِبَادِيَ الَّذِينَ أَسْرَفُوا عَلَىٰ أَنفُسِهِمْ لَا تَقْنَطُوا مِن رَّحْمَةِ اللَّهِ',
+        translation: 'Say, "O My servants who have transgressed against themselves, do not despair of the mercy of Allah."',
+        reference: 'Surah Az-Zumar (39:53)', theme: 'Infinite Mercy',
+        tafsir: 'Allah calls us "My servants"—even those who have sinned greatly. Despair is prohibited. Allah forgives all sins.',
+        reflection: 'Whatever you\'ve done, this verse is for you. Despair itself is prohibited. Turn back—He is waiting.'
+      },
+      {
+        id: 4, category: 'strength',
+        arabic: 'لَا يُكَلِّفُ اللَّهُ نَفْسًا إِلَّا وُسْعَهَا',
+        translation: 'Allah does not burden a soul beyond that it can bear.',
+        reference: 'Surah Al-Baqarah (2:286)', theme: 'Divine Understanding',
+        tafsir: 'This is a statement about Allah\'s knowledge. He knows your capacity better than you do.',
+        reflection: 'If you\'re facing it, you can bear it. Not alone, not without struggle—but you have the capacity.'
+      },
+      {
+        id: 5, category: 'women',
+        arabic: 'إِنَّ الْمُسْلِمِينَ وَالْمُسْلِمَاتِ وَالْمُؤْمِنِينَ وَالْمُؤْمِنَاتِ',
+        translation: 'Indeed, the Muslim men and Muslim women, the believing men and believing women...',
+        reference: 'Surah Al-Ahzab (33:35)', theme: 'Equal Spiritual Standing',
+        tafsir: 'This verse was revealed after Umm Salamah asked why the Quran mostly addressed men. Allah responded by explicitly naming women.',
+        reflection: 'You are seen. You are addressed. Your spiritual journey is your own, not secondary to anyone\'s.'
+      },
+    ];
+
+    const duasDatabase = [
+      {
+        id: 1, category: 'anxiety',
+        arabic: 'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْهَمِّ وَالْحَزَنِ',
+        transliteration: 'Allahumma inni a\'oodhu bika minal hammi wal hazan',
+        translation: 'O Allah, I seek refuge in You from worry and grief.',
+        source: 'Bukhari', benefit: 'The Prophet ﷺ made this dua frequently.', time: 'Anytime'
+      },
+      {
+        id: 2, category: 'anxiety',
+        arabic: 'لَا إِلَٰهَ إِلَّا أَنْتَ سُبْحَانَكَ إِنِّي كُنْتُ مِنَ الظَّالِمِينَ',
+        transliteration: 'La ilaha illa anta subhanaka inni kuntu minaz zalimeen',
+        translation: 'There is no deity except You; exalted are You. Indeed, I have been of the wrongdoers.',
+        source: 'Quran 21:87 - Dua of Yunus', benefit: 'Made from the depths of the whale. No matter how trapped you feel, this dua reaches Allah.', time: 'In distress'
+      },
+      {
+        id: 3, category: 'protection',
+        arabic: 'حَسْبُنَا اللَّهُ وَنِعْمَ الْوَكِيلُ',
+        transliteration: 'Hasbunallahu wa ni\'mal wakeel',
+        translation: 'Allah is sufficient for us, and He is the best Disposer of affairs.',
+        source: 'Quran 3:173', benefit: 'Said by Ibrahim when thrown into fire, and by the Companions when faced with overwhelming odds.', time: 'When facing the impossible'
+      },
+      {
+        id: 4, category: 'guidance',
+        arabic: 'رَبِّ اشْرَحْ لِي صَدْرِي ۝ وَيَسِّرْ لِي أَمْرِي',
+        transliteration: 'Rabbish-rahli sadri, wa yassir li amri',
+        translation: 'My Lord, expand for me my chest and ease for me my task.',
+        source: 'Quran 20:25-26 - Dua of Musa', benefit: 'Musa made this dua before confronting Pharaoh. For any task that feels too big.', time: 'Before difficult tasks'
+      },
+      {
+        id: 5, category: 'morning',
+        arabic: 'أَصْبَحْنَا وَأَصْبَحَ الْمُلْكُ لِلَّهِ',
+        transliteration: 'Asbahna wa asbahal mulku lillah',
+        translation: 'We have reached the morning and the kingdom belongs to Allah.',
+        source: 'Abu Dawud', benefit: 'A beautiful way to surrender your day to Allah.', time: 'After Fajr'
+      },
+      {
+        id: 6, category: 'hardship',
+        arabic: 'إِنَّا لِلَّهِ وَإِنَّا إِلَيْهِ رَاجِعُونَ',
+        transliteration: 'Inna lillahi wa inna ilayhi raji\'un',
+        translation: 'Indeed we belong to Allah and to Him we return.',
+        source: 'Quran 2:156', benefit: 'Umm Salamah made this dua when her husband died. Allah replaced him with the Prophet ﷺ.', time: 'During loss'
+      },
+    ];
+
+    const cultureVsIslam = [
+      { id: 1, myth: 'Women cannot enter mosques', truth: 'The Prophet ﷺ said: "Do not prevent the female servants of Allah from the mosques."', source: 'Bukhari 900' },
+      { id: 2, myth: 'Forced marriage is valid in Islam', truth: 'The Prophet ﷺ annulled marriages made without consent.', source: 'Bukhari 5136' },
+      { id: 3, myth: 'Women cannot initiate divorce', truth: 'Khul\' (woman-initiated divorce) is established in the Quran and Sunnah.', source: 'Bukhari 5273' },
+      { id: 4, myth: 'Women should not work', truth: 'Khadijah was a successful businesswoman. The Prophet ﷺ worked for her.', source: 'Historical record' },
+      { id: 5, myth: 'Menstruating women are spiritually impure', truth: 'The Prophet ﷺ was affectionate with Aisha during her period.', source: 'Bukhari 300' },
+      { id: 6, myth: 'A wife must obey her husband in everything', truth: '"There is no obedience to a creation in disobedience to the Creator."', source: 'Ahmad' },
+      { id: 7, myth: 'Women cannot be scholars', truth: 'Aisha taught both men and women, including major scholars.', source: 'Historical consensus' },
+      { id: 8, myth: 'Honor killing has basis in Islam', truth: '"Whoever kills a soul... it is as if he had slain mankind entirely."', source: 'Quran 5:32' },
+    ];
+
+    const sahabiyatDatabase = [
+      {
+        id: 1, name: 'Khadijah bint Khuwaylid', arabic: 'خَدِيجَة', title: 'Mother of the Believers',
+        summary: 'The first Muslim, a successful businesswoman, and the Prophet\'s ﷺ greatest support.',
+        story: 'Khadijah was a wealthy merchant—one of the most successful traders of her time. She proposed marriage to the Prophet ﷺ. She was 40; he was 25. When the first revelation came and he returned trembling, it was Khadijah who calmed him with the famous words: "By Allah, Allah will never disgrace you."',
+        lessons: ['A woman can be financially independent and professionally successful.', 'A woman can propose marriage.', 'Age does not diminish a woman\'s worth.']
+      },
+      {
+        id: 2, name: 'Aisha bint Abi Bakr', arabic: 'عَائِشَة', title: 'Scholar of Islam',
+        summary: 'One of the greatest scholars of Islam, preserving and teaching prophetic knowledge.',
+        story: 'Aisha narrated over 2,200 hadith. Senior scholars would consult her. Her student said: "I never saw anyone more knowledgeable in fiqh, medicine, or poetry than Aisha." She lived as a widow for almost 50 years, dedicating her life to teaching.',
+        lessons: ['Women can and should be scholars and authorities in religion.', 'A woman\'s intellectual legacy can shape civilization.']
+      },
+      {
+        id: 3, name: 'Nusaybah bint Ka\'b', arabic: 'نُسَيْبَة', title: 'Umm Umarah - The Warrior',
+        summary: 'A woman who fought in battle to protect the Prophet ﷺ himself.',
+        story: 'At Uhud, when the Muslims were scattered, she dropped the water-skin and picked up a sword. She fought directly in front of the Prophet ﷺ, shielding him with her own body. She sustained twelve wounds. The Prophet ﷺ said: "Wherever I turned, I saw her fighting in front of me."',
+        lessons: ['Women can be warriors and protectors.', 'Courage is not defined by gender.']
+      },
+      {
+        id: 4, name: 'Sumayyah bint Khayyat', arabic: 'سُمَيَّة', title: 'First Martyr of Islam',
+        summary: 'A formerly enslaved woman who became the first person to die for Islam.',
+        story: 'Sumayyah was tortured for her faith. Abu Jahl killed her with a spear for refusing to renounce Islam. She became the first martyr in Islam—not a warrior or leader, but a formerly enslaved woman whose conviction was unshakeable.',
+        lessons: ['Faith does not require worldly power or status.', 'The first martyr of Islam was a woman.']
+      },
+    ];
+
+    const crisisKeywords = ['suicide', 'kill myself', 'want to die', 'abuse', 'hitting me', 'beats me', 'trapped', 'hurt myself'];
+
+    // ============================================
+    // CONTEXT & STATE
+    // ============================================
+    const AppContext = createContext(null);
+
+    const initialState = {
+      onboardingComplete: false,
+      darkMode: false,
+      savedHadith: [],
+      savedVerses: [],
+      savedDuas: [],
+      journal: [],
+      dhikrCount: 0,
+      dhikrGoal: 33,
+    };
+
+    function appReducer(state, action) {
+      switch (action.type) {
+        case 'COMPLETE_ONBOARDING': return { ...state, onboardingComplete: true };
+        case 'TOGGLE_DARK_MODE': return { ...state, darkMode: !state.darkMode };
+        case 'TOGGLE_SAVED_HADITH':
+          return { ...state, savedHadith: state.savedHadith.includes(action.payload)
+            ? state.savedHadith.filter(id => id !== action.payload)
+            : [...state.savedHadith, action.payload] };
+        case 'TOGGLE_SAVED_VERSE':
+          return { ...state, savedVerses: state.savedVerses.includes(action.payload)
+            ? state.savedVerses.filter(id => id !== action.payload)
+            : [...state.savedVerses, action.payload] };
+        case 'ADD_JOURNAL':
+          return { ...state, journal: [{ id: Date.now(), date: new Date().toISOString(), ...action.payload }, ...state.journal] };
+        case 'INCREMENT_DHIKR':
+          const newCount = state.dhikrCount + 1;
+          return { ...state, dhikrCount: newCount >= state.dhikrGoal ? 0 : newCount };
+        case 'RESET_DHIKR': return { ...state, dhikrCount: 0 };
+        case 'LOAD_STATE': return { ...state, ...action.payload };
+        default: return state;
+      }
+    }
+
+    function AppProvider({ children }) {
+      const [state, dispatch] = useReducer(appReducer, initialState, () => {
+        try {
+          const saved = localStorage.getItem('asma-state');
+          return saved ? { ...initialState, ...JSON.parse(saved) } : initialState;
+        } catch { return initialState; }
+      });
+
+      useEffect(() => {
+        localStorage.setItem('asma-state', JSON.stringify(state));
+      }, [state]);
+
+      useEffect(() => {
+        document.documentElement.classList.toggle('dark', state.darkMode);
+      }, [state.darkMode]);
+
+      return <AppContext.Provider value={{ state, dispatch }}>{children}</AppContext.Provider>;
+    }
+
+    const useApp = () => useContext(AppContext);
+
+    // ============================================
+    // UI COMPONENTS
+    // ============================================
+    const Card = ({ children, className = '', onClick }) => (
+      <div onClick={onClick} className={`bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 ${onClick ? 'cursor-pointer active:scale-[0.98] transition-transform' : ''} ${className}`}>
+        {children}
+      </div>
+    );
+
+    const Badge = ({ children, variant = 'default' }) => {
+      const variants = {
+        default: 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300',
+        emerald: 'bg-emerald-50 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300',
+        amber: 'bg-amber-50 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300',
+        rose: 'bg-rose-50 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300',
+      };
+      return <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${variants[variant]}`}>{children}</span>;
+    };
+
+    const Button = ({ children, onClick, disabled, className = '', icon }) => (
+      <button onClick={onClick} disabled={disabled} className={`inline-flex items-center justify-center gap-2 px-4 py-3 bg-neutral-800 dark:bg-emerald-600 text-white rounded-xl font-medium active:bg-neutral-700 dark:active:bg-emerald-700 transition-colors disabled:opacity-40 ${className}`}>
+        {icon && <Icon name={icon} className="w-5 h-5" />}
+        {children}
+      </button>
+    );
+
+    // ============================================
+    // ONBOARDING
+    // ============================================
+    const Onboarding = ({ onComplete }) => {
+      const [step, setStep] = useState(0);
+      return (
+        <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 flex flex-col items-center justify-center p-8">
+          <div className="w-full max-w-sm animate-fade-in">
+            {step === 0 ? (
+              <div className="text-center">
+                <div className="w-20 h-20 mx-auto mb-8 rounded-full bg-emerald-50 dark:bg-emerald-900/50 flex items-center justify-center">
+                  <Icon name="Feather" className="w-8 h-8 text-emerald-700 dark:text-emerald-400" />
+                </div>
+                <h1 className="text-3xl font-light text-neutral-800 dark:text-neutral-100 mb-2">Asma</h1>
+                <p className="text-lg text-neutral-400 mb-4">أسماء</p>
+                <p className="text-neutral-500 dark:text-neutral-400 leading-relaxed mb-12">A safe space to understand your faith with clarity and compassion.</p>
+              </div>
+            ) : (
+              <div>
+                <h2 className="text-2xl font-light text-neutral-800 dark:text-neutral-100 mb-8 text-center">Our Promise</h2>
+                <div className="space-y-3 mb-12">
+                  {['All hadith verified for authenticity', 'Female scholars cited throughout', 'AI-powered guidance with real sources', 'Your questions remain private'].map((text, i) => (
+                    <div key={i} className="flex items-start gap-4 p-4 bg-white dark:bg-neutral-800 rounded-xl border border-neutral-200 dark:border-neutral-700">
+                      <Icon name="CheckCircle" className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                      <p className="text-neutral-600 dark:text-neutral-300">{text}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <Button onClick={() => step === 0 ? setStep(1) : onComplete()} className="w-full">
+              {step === 0 ? 'Begin' : 'Continue'}
+            </Button>
+            <div className="flex justify-center gap-2 mt-8">
+              {[0, 1].map(i => (
+                <div key={i} className={`h-1.5 rounded-full transition-all ${i === step ? 'w-8 bg-emerald-600' : 'w-1.5 bg-neutral-300 dark:bg-neutral-600'}`} />
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================
+    // HADITH CARD
+    // ============================================
+    const HadithCard = ({ hadith, onExplain }) => {
+      const [expanded, setExpanded] = useState(false);
+      const { state, dispatch } = useApp();
+      const isSaved = state.savedHadith.includes(hadith.id);
+
+      return (
+        <Card className="mb-4 overflow-hidden">
+          <div className="p-5">
+            <div className="flex items-center justify-between mb-4">
+              <Badge variant={hadith.authenticity === 'Sahih' ? 'emerald' : 'amber'}>
+                <Icon name="CheckCircle" className="w-3 h-3" /> {hadith.authenticity}
+              </Badge>
+              <button onClick={() => dispatch({ type: 'TOGGLE_SAVED_HADITH', payload: hadith.id })} className={`p-2 rounded-lg transition-colors ${isSaved ? 'bg-emerald-50 dark:bg-emerald-900/50 text-emerald-600' : 'text-neutral-400'}`}>
+                <Icon name="Bookmark" className="w-4 h-4" fill={isSaved} />
+              </button>
+            </div>
+            <div className="mb-4 py-4 border-y border-neutral-100 dark:border-neutral-700">
+              <p className="text-xl text-neutral-700 dark:text-neutral-200 leading-loose text-right font-arabic" dir="rtl">{hadith.arabic}</p>
+            </div>
+            <p className="text-neutral-600 dark:text-neutral-300 leading-relaxed mb-4 italic">"{hadith.text}"</p>
+            <div className="flex items-center gap-2 text-sm text-neutral-400">
+              <Icon name="BookOpen" className="w-4 h-4" />
+              <span>{hadith.source}</span>
+            </div>
+          </div>
+          <div className="border-t border-neutral-100 dark:border-neutral-700">
+            <button onClick={() => setExpanded(!expanded)} className="w-full px-5 py-3 flex items-center justify-between text-neutral-500">
+              <span className="text-sm font-medium">Context & Understanding</span>
+              <Icon name="ChevronDown" className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+            </button>
+            {expanded && (
+              <div className="px-5 pb-5 space-y-4 animate-fade-in">
+                <div className="p-4 bg-neutral-50 dark:bg-neutral-900 rounded-xl">
+                  <p className="text-xs font-medium text-neutral-400 uppercase mb-2">Historical Context</p>
+                  <p className="text-neutral-600 dark:text-neutral-300 text-sm">{hadith.context}</p>
+                </div>
+                <div className="p-4 bg-emerald-50 dark:bg-emerald-900/30 rounded-xl">
+                  <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400 uppercase mb-2">✓ What This Means</p>
+                  <p className="text-neutral-600 dark:text-neutral-300 text-sm">{hadith.doesMean}</p>
+                </div>
+                <div className="p-4 bg-amber-50 dark:bg-amber-900/30 rounded-xl">
+                  <p className="text-xs font-medium text-amber-700 dark:text-amber-400 uppercase mb-2">⚠ What This Does Not Mean</p>
+                  <p className="text-neutral-600 dark:text-neutral-300 text-sm">{hadith.doesNotMean}</p>
+                </div>
+                <div className="p-4 bg-violet-50 dark:bg-violet-900/30 rounded-xl">
+                  <p className="text-xs font-medium text-violet-700 dark:text-violet-400 uppercase mb-2">Scholarly Perspective</p>
+                  <p className="text-neutral-600 dark:text-neutral-300 text-sm">{hadith.scholarly}</p>
+                </div>
+                <Button onClick={() => onExplain(hadith)} className="w-full" icon="Sparkles">Explain Gently</Button>
+              </div>
+            )}
+          </div>
+        </Card>
+      );
+    };
+
+    // ============================================
+    // ASK SAFELY
+    // ============================================
+    const AskSafely = ({ onBack }) => {
+      const [question, setQuestion] = useState('');
+      const [messages, setMessages] = useState([]);
+      const [loading, setLoading] = useState(false);
+      const [showCrisis, setShowCrisis] = useState(false);
+
+      const suggestions = ['Is makeup permissible?', 'Can I pray in my language?', 'Can women lead prayer?'];
+
+      const handleSubmit = async () => {
+        if (!question.trim() || loading) return;
+        if (crisisKeywords.some(k => question.toLowerCase().includes(k))) {
+          setShowCrisis(true);
+          return;
+        }
+        const userMsg = question.trim();
+        setQuestion('');
+        setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+        setLoading(true);
+
+        // Simulated response (replace with actual API call)
+        setTimeout(() => {
+          const response = `Thank you for your question, sister. This is an important topic.\n\nIn Islamic scholarship, there are various perspectives on this matter. I recommend consulting SeekersGuidance.org or Rabata.org for detailed scholarly answers.\n\nRemember: asking questions is a sign of engaged faith, not doubt. May Allah guide us all.`;
+          setMessages(prev => [...prev, { role: 'assistant', content: response }]);
+          setLoading(false);
+        }, 1500);
+      };
+
+      return (
+        <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 flex flex-col">
+          {showCrisis && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+              <Card className="p-6 max-w-sm">
+                <div className="w-12 h-12 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Icon name="Heart" className="w-6 h-6 text-rose-500" />
+                </div>
+                <h3 className="text-xl font-medium text-center mb-2">You Are Not Alone</h3>
+                <p className="text-neutral-500 text-center text-sm mb-6">Please reach out to someone who can help.</p>
+                <div className="space-y-3 mb-4">
+                  <a href="tel:988" className="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-neutral-700 rounded-xl">
+                    <Icon name="Phone" className="w-5 h-5" />
+                    <div><p className="font-medium text-sm">988 Crisis Lifeline</p><p className="text-xs text-neutral-400">Call or text</p></div>
+                  </a>
+                  <a href="tel:18666274448" className="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-neutral-700 rounded-xl">
+                    <Icon name="Phone" className="w-5 h-5" />
+                    <div><p className="font-medium text-sm">NASEEHA Muslim Helpline</p><p className="text-xs text-neutral-400">1-866-627-3342</p></div>
+                  </a>
+                </div>
+                <Button onClick={() => setShowCrisis(false)} className="w-full">Continue</Button>
+              </Card>
+            </div>
+          )}
+
+          <div className="p-5 pt-12 max-w-lg mx-auto w-full">
+            <button onClick={onBack} className="flex items-center gap-2 text-neutral-400 mb-6">
+              <Icon name="ChevronLeft" className="w-5 h-5" /> Back
+            </button>
+            <Card className="p-5 mb-6">
+              <div className="flex items-center gap-4 mb-3">
+                <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-900/50 rounded-xl flex items-center justify-center">
+                  <Icon name="Lock" className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-medium">Ask Safely</h1>
+                  <p className="text-sm text-neutral-400">Private. No judgment.</p>
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-5 max-w-lg mx-auto w-full">
+            {messages.length === 0 && (
+              <div className="mb-6">
+                <p className="text-xs font-medium text-neutral-400 uppercase mb-3">Try asking</p>
+                <div className="flex flex-wrap gap-2">
+                  {suggestions.map((s, i) => (
+                    <button key={i} onClick={() => setQuestion(s)} className="px-3 py-2 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg text-sm">{s}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {messages.map((msg, i) => (
+              <div key={i} className={`mb-4 ${msg.role === 'user' ? 'flex justify-end' : ''}`}>
+                <div className={`max-w-[85%] p-4 rounded-2xl ${msg.role === 'user' ? 'bg-neutral-800 text-white rounded-br-md' : 'bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-bl-md'}`}>
+                  <p className="text-sm whitespace-pre-line">{msg.content}</p>
+                </div>
+              </div>
+            ))}
+            {loading && (
+              <div className="mb-4">
+                <div className="max-w-[85%] p-4 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-2xl">
+                  <div className="flex gap-2">
+                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }} />
+                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }} />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="p-5 border-t border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 max-w-lg mx-auto w-full">
+            <div className="flex gap-3">
+              <input type="text" value={question} onChange={e => setQuestion(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSubmit()} placeholder="Type your question..." className="flex-1 px-4 py-3 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl text-sm focus:outline-none focus:border-emerald-500" />
+              <Button onClick={handleSubmit} disabled={!question.trim() || loading} className="px-4">
+                <Icon name="Send" className="w-5 h-5" />
+              </Button>
+            </div>
+            <p className="text-xs text-neutral-400 text-center mt-3">Educational guidance only — not a fatwa</p>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================
+    // DHIKR COUNTER
+    // ============================================
+    const DhikrCounter = ({ onBack }) => {
+      const { state, dispatch } = useApp();
+      const [showComplete, setShowComplete] = useState(false);
+      const progress = (state.dhikrCount / state.dhikrGoal) * 100;
+
+      const handleTap = () => {
+        if (navigator.vibrate) navigator.vibrate(10);
+        if (state.dhikrCount + 1 >= state.dhikrGoal) {
+          setShowComplete(true);
+          setTimeout(() => setShowComplete(false), 1500);
+        }
+        dispatch({ type: 'INCREMENT_DHIKR' });
+      };
+
+      return (
+        <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 flex flex-col">
+          <div className="p-5 pt-12 max-w-lg mx-auto w-full">
+            <button onClick={onBack} className="flex items-center gap-2 text-neutral-400 mb-6">
+              <Icon name="ChevronLeft" className="w-5 h-5" /> Back
+            </button>
+          </div>
+          <div className="flex-1 flex flex-col items-center justify-center px-5">
+            {showComplete && (
+              <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+                <div className="w-24 h-24 bg-emerald-500 rounded-full flex items-center justify-center animate-pulse">
+                  <Icon name="Check" className="w-12 h-12 text-white" />
+                </div>
+              </div>
+            )}
+            <p className="text-3xl text-neutral-700 dark:text-neutral-200 font-arabic mb-2" dir="rtl">سُبْحَانَ اللَّهِ</p>
+            <p className="text-neutral-500 text-sm mb-8">Glory be to Allah</p>
+            <button onClick={handleTap} className="relative w-56 h-56 rounded-full flex items-center justify-center active:scale-95 transition-transform">
+              <svg className="absolute inset-0 w-full h-full -rotate-90">
+                <circle cx="112" cy="112" r="100" fill="none" stroke="currentColor" strokeWidth="8" className="text-neutral-200 dark:text-neutral-700" />
+                <circle cx="112" cy="112" r="100" fill="none" stroke="currentColor" strokeWidth="8" strokeLinecap="round" strokeDasharray={628} strokeDashoffset={628 * (1 - progress / 100)} className="text-emerald-500 transition-all" />
+              </svg>
+              <div className="w-44 h-44 rounded-full bg-white dark:bg-neutral-800 shadow-lg flex flex-col items-center justify-center">
+                <span className="text-5xl font-light">{state.dhikrCount}</span>
+                <span className="text-sm text-neutral-400">/ {state.dhikrGoal}</span>
+              </div>
+            </button>
+            <button onClick={() => dispatch({ type: 'RESET_DHIKR' })} className="mt-8 flex items-center gap-2 text-neutral-400">
+              <Icon name="RotateCcw" className="w-4 h-4" /> Reset
+            </button>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================
+    // CULTURE VS ISLAM
+    // ============================================
+    const CultureVsIslamView = ({ onBack }) => {
+      const [expanded, setExpanded] = useState(null);
+      return (
+        <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 pb-24">
+          <div className="p-5 pt-12 max-w-lg mx-auto">
+            <button onClick={onBack} className="flex items-center gap-2 text-neutral-400 mb-8">
+              <Icon name="ChevronLeft" className="w-5 h-5" /> Back
+            </button>
+            <Card className="p-6 mb-6">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-12 h-12 bg-amber-50 dark:bg-amber-900/50 rounded-xl flex items-center justify-center">
+                  <Icon name="Scale" className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-medium">Culture vs Islam</h1>
+                  <p className="text-sm text-neutral-400">Know the difference</p>
+                </div>
+              </div>
+            </Card>
+            <div className="space-y-3">
+              {cultureVsIslam.map(item => (
+                <Card key={item.id} className="overflow-hidden" onClick={() => setExpanded(expanded === item.id ? null : item.id)}>
+                  <div className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-6 h-6 bg-rose-50 dark:bg-rose-900/50 rounded-full flex items-center justify-center flex-shrink-0">
+                        <Icon name="X" className="w-3 h-3 text-rose-500" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-neutral-700 dark:text-neutral-200 text-sm font-medium">{item.myth}</p>
+                        <p className="text-xs text-neutral-400 mt-1">Tap to see evidence</p>
+                      </div>
+                      <Icon name="ChevronDown" className={`w-4 h-4 text-neutral-300 transition-transform ${expanded === item.id ? 'rotate-180' : ''}`} />
+                    </div>
+                  </div>
+                  {expanded === item.id && (
+                    <div className="px-4 pb-4 border-t border-neutral-100 dark:border-neutral-700 pt-4 animate-fade-in">
+                      <div className="flex items-start gap-3">
+                        <div className="w-6 h-6 bg-emerald-50 dark:bg-emerald-900/50 rounded-full flex items-center justify-center flex-shrink-0">
+                          <Icon name="CheckCircle" className="w-3 h-3 text-emerald-500" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 mb-1">What Islam Says</p>
+                          <p className="text-neutral-600 dark:text-neutral-300 text-sm">{item.truth}</p>
+                          <p className="text-xs text-neutral-400 mt-2">{item.source}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================
+    // QURAN VIEW
+    // ============================================
+    const QuranView = ({ onBack }) => {
+      const { state, dispatch } = useApp();
+      const [expanded, setExpanded] = useState(null);
+      return (
+        <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 pb-24">
+          <div className="p-5 pt-12 max-w-lg mx-auto">
+            <button onClick={onBack} className="flex items-center gap-2 text-neutral-400 mb-6">
+              <Icon name="ChevronLeft" className="w-5 h-5" /> Back
+            </button>
+            <Card className="p-5 mb-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-rose-50 dark:bg-rose-900/50 rounded-xl flex items-center justify-center">
+                  <Icon name="BookOpen" className="w-6 h-6 text-rose-600 dark:text-rose-400" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-medium">Quranic Verses</h1>
+                  <p className="text-sm text-neutral-400">Words of comfort & guidance</p>
+                </div>
+              </div>
+            </Card>
+            <div className="space-y-4">
+              {quranicVerses.map(verse => (
+                <Card key={verse.id} className="overflow-hidden">
+                  <div className="p-5">
+                    <Badge variant="rose">{verse.theme}</Badge>
+                    <p className="text-xl text-neutral-700 dark:text-neutral-200 leading-loose text-right font-arabic my-4" dir="rtl">{verse.arabic}</p>
+                    <p className="text-neutral-600 dark:text-neutral-300 leading-relaxed mb-4 italic">"{verse.translation}"</p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-neutral-400">{verse.reference}</p>
+                      <button onClick={() => dispatch({ type: 'TOGGLE_SAVED_VERSE', payload: verse.id })} className={`p-2 rounded-lg ${state.savedVerses.includes(verse.id) ? 'bg-rose-50 text-rose-600' : 'text-neutral-400'}`}>
+                        <Icon name="Heart" className="w-4 h-4" fill={state.savedVerses.includes(verse.id)} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="border-t border-neutral-100 dark:border-neutral-700">
+                    <button onClick={() => setExpanded(expanded === verse.id ? null : verse.id)} className="w-full px-5 py-3 flex items-center justify-between text-neutral-500">
+                      <span className="text-sm font-medium">Reflection & Tafsir</span>
+                      <Icon name="ChevronDown" className={`w-4 h-4 transition-transform ${expanded === verse.id ? 'rotate-180' : ''}`} />
+                    </button>
+                    {expanded === verse.id && (
+                      <div className="px-5 pb-5 space-y-4 animate-fade-in">
+                        <div className="p-4 bg-neutral-50 dark:bg-neutral-900 rounded-xl">
+                          <p className="text-xs font-medium text-neutral-400 uppercase mb-2">Understanding</p>
+                          <p className="text-neutral-600 dark:text-neutral-300 text-sm">{verse.tafsir}</p>
+                        </div>
+                        <div className="p-4 bg-rose-50 dark:bg-rose-900/30 rounded-xl">
+                          <p className="text-xs font-medium text-rose-700 dark:text-rose-400 uppercase mb-2">Reflection</p>
+                          <p className="text-neutral-600 dark:text-neutral-300 text-sm">{verse.reflection}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================
+    // DUAS VIEW
+    // ============================================
+    const DuasView = ({ onBack }) => {
+      const [expanded, setExpanded] = useState(null);
+      return (
+        <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 pb-24">
+          <div className="p-5 pt-12 max-w-lg mx-auto">
+            <button onClick={onBack} className="flex items-center gap-2 text-neutral-400 mb-6">
+              <Icon name="ChevronLeft" className="w-5 h-5" /> Back
+            </button>
+            <Card className="p-5 mb-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-900/50 rounded-xl flex items-center justify-center">
+                  <Icon name="Heart" className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-medium">Daily Duas</h1>
+                  <p className="text-sm text-neutral-400">Supplications for every moment</p>
+                </div>
+              </div>
+            </Card>
+            <div className="space-y-4">
+              {duasDatabase.map(dua => (
+                <Card key={dua.id} className="overflow-hidden">
+                  <div className="p-5">
+                    <Badge>{dua.time}</Badge>
+                    <p className="text-xl text-neutral-700 dark:text-neutral-200 leading-loose text-right font-arabic my-4" dir="rtl">{dua.arabic}</p>
+                    <p className="text-neutral-500 dark:text-neutral-400 text-sm italic mb-3">{dua.transliteration}</p>
+                    <p className="text-neutral-600 dark:text-neutral-300 mb-3">"{dua.translation}"</p>
+                    <p className="text-xs text-neutral-400">{dua.source}</p>
+                  </div>
+                  <div className="border-t border-neutral-100 dark:border-neutral-700">
+                    <button onClick={() => setExpanded(expanded === dua.id ? null : dua.id)} className="w-full px-5 py-3 flex items-center justify-between text-neutral-500">
+                      <span className="text-sm font-medium">Learn More</span>
+                      <Icon name="ChevronDown" className={`w-4 h-4 transition-transform ${expanded === dua.id ? 'rotate-180' : ''}`} />
+                    </button>
+                    {expanded === dua.id && (
+                      <div className="px-5 pb-5 animate-fade-in">
+                        <div className="p-4 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl">
+                          <p className="text-xs font-medium text-indigo-700 dark:text-indigo-400 uppercase mb-2">Why This Dua</p>
+                          <p className="text-neutral-600 dark:text-neutral-300 text-sm">{dua.benefit}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================
+    // SAHABIYAT VIEW
+    // ============================================
+    const SahabiyatView = ({ onBack }) => {
+      const [selected, setSelected] = useState(null);
+
+      if (selected) {
+        return (
+          <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 pb-24">
+            <div className="p-5 pt-12 max-w-lg mx-auto">
+              <button onClick={() => setSelected(null)} className="flex items-center gap-2 text-neutral-400 mb-6">
+                <Icon name="ChevronLeft" className="w-5 h-5" /> Back
+              </button>
+              <Card className="p-6 mb-6 text-center">
+                <div className="w-20 h-20 mx-auto bg-gradient-to-br from-pink-100 to-rose-100 dark:from-pink-900/50 dark:to-rose-900/50 rounded-full flex items-center justify-center mb-4">
+                  <span className="text-3xl font-arabic text-pink-700 dark:text-pink-300">{selected.arabic.charAt(0)}</span>
+                </div>
+                <h1 className="text-2xl font-medium mb-1">{selected.name}</h1>
+                <p className="text-lg font-arabic text-neutral-700 dark:text-neutral-200" dir="rtl">{selected.arabic}</p>
+                <Badge variant="rose" className="mt-3">{selected.title}</Badge>
+              </Card>
+              <Card className="p-5 mb-6">
+                <h2 className="text-sm font-medium text-neutral-400 uppercase mb-4">Her Story</h2>
+                <p className="text-neutral-600 dark:text-neutral-300 leading-relaxed whitespace-pre-line text-sm">{selected.story}</p>
+              </Card>
+              <Card className="p-5">
+                <h2 className="text-sm font-medium text-neutral-400 uppercase mb-4">Lessons</h2>
+                <div className="space-y-3">
+                  {selected.lessons.map((lesson, i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <div className="w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs font-medium text-amber-700 dark:text-amber-300">{i + 1}</span>
+                      </div>
+                      <p className="text-neutral-600 dark:text-neutral-300 text-sm">{lesson}</p>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 pb-24">
+          <div className="p-5 pt-12 max-w-lg mx-auto">
+            <button onClick={onBack} className="flex items-center gap-2 text-neutral-400 mb-6">
+              <Icon name="ChevronLeft" className="w-5 h-5" /> Back
+            </button>
+            <Card className="p-5 mb-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-pink-50 dark:bg-pink-900/50 rounded-xl flex items-center justify-center">
+                  <Icon name="Users" className="w-6 h-6 text-pink-600 dark:text-pink-400" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-medium">Stories of Sahabiyat</h1>
+                  <p className="text-sm text-neutral-400">Women of the Prophet's ﷺ era</p>
+                </div>
+              </div>
+            </Card>
+            <div className="space-y-4">
+              {sahabiyatDatabase.map(story => (
+                <Card key={story.id} className="p-4" onClick={() => setSelected(story)}>
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-gradient-to-br from-pink-100 to-rose-100 dark:from-pink-900/50 dark:to-rose-900/50 rounded-xl flex items-center justify-center">
+                      <span className="text-2xl font-arabic text-pink-700 dark:text-pink-300">{story.arabic.charAt(0)}</span>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-medium">{story.name}</h3>
+                      <p className="text-sm text-neutral-400">{story.title}</p>
+                      <p className="text-xs text-neutral-500 mt-1">{story.summary}</p>
+                    </div>
+                    <Icon name="ChevronRight" className="w-5 h-5 text-neutral-300" />
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================
+    // TOPIC VIEW
+    // ============================================
+    const TopicView = ({ topic, onBack, onExplain }) => {
+      const relevantHadith = hadithDatabase.filter(h => h.topic === topic.id);
+      return (
+        <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 pb-24">
+          <div className="p-5 pt-12 max-w-lg mx-auto">
+            <button onClick={onBack} className="flex items-center gap-2 text-neutral-400 mb-8">
+              <Icon name="ChevronLeft" className="w-5 h-5" /> Back
+            </button>
+            <div className="flex items-center gap-4 mb-8">
+              <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-900/50 rounded-2xl flex items-center justify-center">
+                <Icon name={topic.icon} className="w-7 h-7 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-medium">{topic.name}</h1>
+                <p className="text-neutral-400">{topic.description}</p>
+              </div>
+            </div>
+            <p className="text-sm text-neutral-400 mb-4">{relevantHadith.length} hadith</p>
+            {relevantHadith.map(h => <HadithCard key={h.id} hadith={h} onExplain={onExplain} />)}
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================
+    // JOURNAL
+    // ============================================
+    const Journal = ({ onBack }) => {
+      const { state, dispatch } = useApp();
+      const [content, setContent] = useState('');
+      const [showNew, setShowNew] = useState(false);
+
+      const handleSave = () => {
+        if (!content.trim()) return;
+        dispatch({ type: 'ADD_JOURNAL', payload: { content: content.trim() } });
+        setContent('');
+        setShowNew(false);
+      };
+
+      return (
+        <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 pb-24">
+          <div className="p-5 pt-12 max-w-lg mx-auto">
+            <button onClick={onBack} className="flex items-center gap-2 text-neutral-400 mb-6">
+              <Icon name="ChevronLeft" className="w-5 h-5" /> Back
+            </button>
+            <Card className="p-5 mb-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-violet-50 dark:bg-violet-900/50 rounded-xl flex items-center justify-center">
+                  <Icon name="BookOpen" className="w-6 h-6 text-violet-600 dark:text-violet-400" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-medium">Reflection Journal</h1>
+                  <p className="text-sm text-neutral-400">Your private space</p>
+                </div>
+              </div>
+            </Card>
+
+            {showNew ? (
+              <Card className="p-5 mb-6">
+                <textarea value={content} onChange={e => setContent(e.target.value)} placeholder="Write your thoughts..." className="w-full px-4 py-3 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl text-sm focus:outline-none focus:border-emerald-500 resize-none" rows={6} />
+                <div className="flex gap-3 mt-4">
+                  <Button onClick={() => { setShowNew(false); setContent(''); }} className="flex-1 bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-200">Cancel</Button>
+                  <Button onClick={handleSave} className="flex-1" disabled={!content.trim()}>Save</Button>
+                </div>
+              </Card>
+            ) : (
+              <Button onClick={() => setShowNew(true)} className="w-full mb-6" icon="Plus">New Reflection</Button>
+            )}
+
+            {state.journal.length === 0 ? (
+              <Card className="p-8 text-center">
+                <Icon name="BookOpen" className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
+                <p className="text-neutral-500">No reflections yet.</p>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {state.journal.map(entry => (
+                  <Card key={entry.id} className="p-4">
+                    <p className="text-xs text-neutral-400 mb-2">{new Date(entry.date).toLocaleDateString()}</p>
+                    <p className="text-neutral-600 dark:text-neutral-300 text-sm whitespace-pre-line">{entry.content}</p>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================
+    // SETTINGS
+    // ============================================
+    const Settings = ({ onBack }) => {
+      const { state, dispatch } = useApp();
+      return (
+        <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 pb-24">
+          <div className="p-5 pt-12 max-w-lg mx-auto">
+            <button onClick={onBack} className="flex items-center gap-2 text-neutral-400 mb-8">
+              <Icon name="ChevronLeft" className="w-5 h-5" /> Back
+            </button>
+            <h1 className="text-2xl font-medium mb-6">Settings</h1>
+            <Card className="divide-y divide-neutral-100 dark:divide-neutral-700 mb-6">
+              <div className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Icon name={state.darkMode ? 'Moon' : 'Sun'} className="w-5 h-5 text-neutral-500" />
+                  <span>Dark Mode</span>
+                </div>
+                <button onClick={() => dispatch({ type: 'TOGGLE_DARK_MODE' })} className={`w-12 h-7 rounded-full p-1 transition-colors ${state.darkMode ? 'bg-emerald-600' : 'bg-neutral-200'}`}>
+                  <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${state.darkMode ? 'translate-x-5' : ''}`} />
+                </button>
+              </div>
+            </Card>
+            <Card className="p-4 mb-6">
+              <div className="flex items-start gap-3">
+                <Icon name="Info" className="w-5 h-5 text-neutral-400 flex-shrink-0" />
+                <p className="text-sm text-neutral-500">All your data is stored locally on your device. We don't collect any personal information.</p>
+              </div>
+            </Card>
+            <Card className="p-5 text-center">
+              <div className="w-12 h-12 mx-auto bg-emerald-50 dark:bg-emerald-900/50 rounded-full flex items-center justify-center mb-3">
+                <Icon name="Heart" className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <h3 className="font-medium mb-1">Asma</h3>
+              <p className="text-sm text-neutral-400">Built with love for Muslim women seeking understanding.</p>
+            </Card>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================
+    // HOME SCREEN
+    // ============================================
+    const HomeScreen = ({ onSelectTopic, onAskSafely, onCultureVsIslam, onQuran, onDuas, onSahabiyat, onJournal }) => {
+      const [showPanic, setShowPanic] = useState(false);
+      const dailyHadith = hadithDatabase[Math.floor(Date.now() / 86400000) % hadithDatabase.length];
+
+      if (showPanic) {
+        return (
+          <div className="min-h-screen bg-neutral-100 dark:bg-neutral-900 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-neutral-800 rounded-2xl shadow-lg p-6 w-full max-w-xs">
+              <div className="text-right text-4xl font-light mb-4 h-12 flex items-center justify-end">0</div>
+              <div className="grid grid-cols-4 gap-2">
+                {['C', '±', '%', '÷', '7', '8', '9', '×', '4', '5', '6', '−', '1', '2', '3', '+', '0', '.', '='].map(btn => (
+                  <button key={btn} onClick={() => btn === 'C' && setShowPanic(false)} className={`p-3.5 rounded-xl text-lg font-medium transition-colors ${['÷', '×', '−', '+', '='].includes(btn) ? 'bg-amber-500 text-white' : ['C', '±', '%'].includes(btn) ? 'bg-neutral-200 dark:bg-neutral-600' : 'bg-neutral-100 dark:bg-neutral-700'} ${btn === '0' ? 'col-span-2' : ''}`}>{btn}</button>
+                ))}
+              </div>
+              <p className="text-center text-xs text-neutral-400 mt-4">Tap C to return</p>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 pb-24">
+          <div className="p-5 pt-8 max-w-lg mx-auto">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h1 className="text-2xl font-medium">Asma</h1>
+                <p className="text-sm text-neutral-400">Your safe space</p>
+              </div>
+              <button onClick={() => setShowPanic(true)} className="w-10 h-10 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl flex items-center justify-center" title="Panic button">
+                <Icon name="EyeOff" className="w-5 h-5 text-neutral-400" />
+              </button>
+            </div>
+
+            <Card className="p-5 mb-6">
+              <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase mb-3">Today's Reflection</p>
+              <p className="text-neutral-600 dark:text-neutral-300 italic leading-relaxed mb-3">"{dailyHadith.text.substring(0, 80)}..."</p>
+              <p className="text-xs text-neutral-400">{dailyHadith.source}</p>
+            </Card>
+
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              <Card className="p-4" onClick={onAskSafely}>
+                <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-900/50 rounded-xl flex items-center justify-center mb-3">
+                  <Icon name="Lock" className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <h3 className="font-medium text-sm">Ask Safely</h3>
+                <p className="text-xs text-neutral-400">AI-powered guidance</p>
+              </Card>
+              <Card className="p-4" onClick={onCultureVsIslam}>
+                <div className="w-10 h-10 bg-amber-50 dark:bg-amber-900/50 rounded-xl flex items-center justify-center mb-3">
+                  <Icon name="Scale" className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                </div>
+                <h3 className="font-medium text-sm">Culture vs Islam</h3>
+                <p className="text-xs text-neutral-400">Know the difference</p>
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-4 gap-3 mb-8">
+              <Card className="p-3 text-center" onClick={onQuran}>
+                <div className="w-10 h-10 mx-auto bg-rose-50 dark:bg-rose-900/50 rounded-xl flex items-center justify-center mb-2">
+                  <Icon name="BookOpen" className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+                </div>
+                <p className="text-xs font-medium">Quran</p>
+              </Card>
+              <Card className="p-3 text-center" onClick={onDuas}>
+                <div className="w-10 h-10 mx-auto bg-indigo-50 dark:bg-indigo-900/50 rounded-xl flex items-center justify-center mb-2">
+                  <Icon name="Heart" className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                </div>
+                <p className="text-xs font-medium">Duas</p>
+              </Card>
+              <Card className="p-3 text-center" onClick={onSahabiyat}>
+                <div className="w-10 h-10 mx-auto bg-pink-50 dark:bg-pink-900/50 rounded-xl flex items-center justify-center mb-2">
+                  <Icon name="Users" className="w-5 h-5 text-pink-600 dark:text-pink-400" />
+                </div>
+                <p className="text-xs font-medium">Sahabiyat</p>
+              </Card>
+              <Card className="p-3 text-center" onClick={onJournal}>
+                <div className="w-10 h-10 mx-auto bg-violet-50 dark:bg-violet-900/50 rounded-xl flex items-center justify-center mb-2">
+                  <Icon name="Edit3" className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+                </div>
+                <p className="text-xs font-medium">Journal</p>
+              </Card>
+            </div>
+
+            <h2 className="text-xs font-medium text-neutral-400 uppercase mb-4">Explore Topics</h2>
+            <div className="space-y-2">
+              {topics.map(topic => (
+                <Card key={topic.id} className="p-4" onClick={() => onSelectTopic(topic)}>
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-neutral-100 dark:bg-neutral-700 rounded-xl flex items-center justify-center">
+                      <Icon name={topic.icon} className="w-5 h-5 text-neutral-500 dark:text-neutral-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-medium text-sm">{topic.name}</h3>
+                      <p className="text-xs text-neutral-400">{topic.description}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-neutral-400">{hadithDatabase.filter(h => h.topic === topic.id).length}</span>
+                      <Icon name="ChevronRight" className="w-4 h-4 text-neutral-300" />
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+
+            <Card className="p-4 mt-8">
+              <div className="flex items-start gap-3">
+                <Icon name="Info" className="w-5 h-5 text-neutral-400 flex-shrink-0" />
+                <p className="text-xs text-neutral-500 leading-relaxed">Asma provides educational guidance with Islamic sources. This is not a substitute for scholarly advice.</p>
+              </div>
+            </Card>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================
+    // BOTTOM NAV
+    // ============================================
+    const BottomNav = ({ activeTab, onTabChange }) => {
+      const items = [
+        { id: 'home', icon: 'Home', label: 'Home' },
+        { id: 'dhikr', icon: 'Circle', label: 'Dhikr' },
+        { id: 'saved', icon: 'Bookmark', label: 'Saved' },
+        { id: 'settings', icon: 'Settings', label: 'Settings' },
+      ];
+      return (
+        <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-neutral-800 border-t border-neutral-200 dark:border-neutral-700 safe-bottom z-40">
+          <div className="max-w-lg mx-auto flex items-center justify-around py-2">
+            {items.map(item => (
+              <button key={item.id} onClick={() => onTabChange(item.id)} className={`flex flex-col items-center py-2 px-4 transition-colors ${activeTab === item.id ? 'text-emerald-600 dark:text-emerald-400' : 'text-neutral-400'}`}>
+                <Icon name={item.icon} className="w-6 h-6" fill={item.id === 'dhikr' && activeTab === item.id} />
+                <span className="text-xs mt-1">{item.label}</span>
+              </button>
+            ))}
+          </div>
+        </nav>
+      );
+    };
+
+    // ============================================
+    // SAVED VIEW
+    // ============================================
+    const SavedView = ({ onBack }) => {
+      const { state } = useApp();
+      const savedHadith = hadithDatabase.filter(h => state.savedHadith.includes(h.id));
+      const savedVerses = quranicVerses.filter(v => state.savedVerses.includes(v.id));
+
+      return (
+        <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 pb-24">
+          <div className="p-5 pt-12 max-w-lg mx-auto">
+            <button onClick={onBack} className="flex items-center gap-2 text-neutral-400 mb-6">
+              <Icon name="ChevronLeft" className="w-5 h-5" /> Back
+            </button>
+            <Card className="p-5 mb-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-amber-50 dark:bg-amber-900/50 rounded-xl flex items-center justify-center">
+                  <Icon name="Bookmark" className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-medium">Saved</h1>
+                  <p className="text-sm text-neutral-400">{savedHadith.length + savedVerses.length} items</p>
+                </div>
+              </div>
+            </Card>
+
+            {savedHadith.length === 0 && savedVerses.length === 0 ? (
+              <Card className="p-8 text-center">
+                <Icon name="Bookmark" className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
+                <p className="text-neutral-500">Nothing saved yet.</p>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {savedHadith.map(h => (
+                  <Card key={h.id} className="p-4">
+                    <Badge variant={h.authenticity === 'Sahih' ? 'emerald' : 'amber'}>{h.authenticity}</Badge>
+                    <p className="text-sm text-neutral-600 dark:text-neutral-300 italic mt-2 line-clamp-2">"{h.text}"</p>
+                    <p className="text-xs text-neutral-400 mt-2">{h.source}</p>
+                  </Card>
+                ))}
+                {savedVerses.map(v => (
+                  <Card key={v.id} className="p-4">
+                    <Badge variant="rose">{v.theme}</Badge>
+                    <p className="text-sm text-neutral-600 dark:text-neutral-300 italic mt-2 line-clamp-2">"{v.translation}"</p>
+                    <p className="text-xs text-neutral-400 mt-2">{v.reference}</p>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================
+    // EXPLANATION MODAL
+    // ============================================
+    const ExplanationModal = ({ hadith, onClose }) => {
+      const explanations = {
+        1: "This hadith is beautifully clear: your consent matters.\n\nThe Prophet ﷺ lived in a time when women were often treated as property—yet he insisted that no woman could be married without her genuine agreement.\n\nIf anyone uses culture or family pressure to override your choice, that contradicts this clear teaching. You have every right to say no.",
+        2: "When Aisha got her period during Hajj, she cried. She felt she had ruined everything.\n\nLook at how the Prophet ﷺ responded—with tender words: 'Allah wrote this.' The exemption from prayer is mercy, not punishment.\n\nYour cycle is not a barrier between you and Allah.",
+        3: "In a world that judges women by appearance—this hadith is revolutionary.\n\nAllah says: I don't look at that. He looks at your heart and deeds.\n\nYour worth is not in your dress size or relationship status. You are already enough in Allah's eyes.",
+        4: "If you're exhausted—spiritually, mentally, emotionally—this hadith speaks to you.\n\nThe Prophet ﷺ taught that your own self has a right over you. Rest is not laziness.\n\nAllah wants your worship for a lifetime, not a burnout.",
+        5: "This hadith is often misused to trap women. Let's be clear: divorce is halal.\n\n'The most disliked of permissible things'—it is still permissible.\n\nIf you're in an abusive marriage, seeking divorce is using a door Allah Himself left open.",
+        6: "The Prophet ﷺ—the best of creation—wept when his son died. He didn't hide his tears.\n\nFeeling devastated is not lack of faith. It's being human. You can cry and still trust Allah.",
+        7: "This hadith honors mothers immensely—but it should empower, not exhaust you.\n\nYou don't have to do everything. You don't have to be everything.\n\nYour humanity doesn't diminish your honor as a mother.",
+        8: "Haya is often reduced to women's clothing, but it's so much deeper.\n\nIt's about inner dignity, conscience, and awareness of Allah.\n\nTrue haya is empowerment through self-respect, not restriction through shame.",
+      };
+
+      return (
+        <div className="fixed inset-0 bg-black/30 flex items-end sm:items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-neutral-800 rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[80vh] overflow-hidden animate-slide-up">
+            <div className="p-5 border-b border-neutral-100 dark:border-neutral-700 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-900/50 rounded-xl flex items-center justify-center">
+                  <Icon name="Sparkles" className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div>
+                  <h3 className="font-medium">Gentle Explanation</h3>
+                  <p className="text-xs text-neutral-400">For your understanding</p>
+                </div>
+              </div>
+              <button onClick={onClose} className="p-2">
+                <Icon name="X" className="w-5 h-5 text-neutral-400" />
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto max-h-[50vh]">
+              <p className="text-neutral-600 dark:text-neutral-300 leading-relaxed whitespace-pre-line">
+                {explanations[hadith.id] || "This teaching reflects the mercy and wisdom in Islam's guidance. The Prophet ﷺ taught through both word and action.\n\nFor deeper questions, consult a qualified scholar."}
+              </p>
+            </div>
+            <div className="p-4 bg-amber-50 dark:bg-amber-900/30 border-t border-amber-100 dark:border-amber-800">
+              <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-2">
+                <Icon name="Info" className="w-4 h-4 flex-shrink-0" />
+                This is educational context, not a fatwa. For personal rulings, consult a qualified scholar.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================
+    // MAIN APP
+    // ============================================
+    function AppContent() {
+      const { state, dispatch } = useApp();
+      const [view, setView] = useState('home');
+      const [activeTab, setActiveTab] = useState('home');
+      const [selectedTopic, setSelectedTopic] = useState(null);
+      const [explainHadith, setExplainHadith] = useState(null);
+
+      if (!state.onboardingComplete) {
+        return <Onboarding onComplete={() => dispatch({ type: 'COMPLETE_ONBOARDING' })} />;
+      }
+
+      const handleTabChange = (tab) => {
+        setActiveTab(tab);
+        setView(tab);
+      };
+
+      const renderContent = () => {
+        switch (view) {
+          case 'home':
+            return (
+              <HomeScreen
+                onSelectTopic={(topic) => { setSelectedTopic(topic); setView('topic'); }}
+                onAskSafely={() => setView('ask')}
+                onCultureVsIslam={() => setView('culture')}
+                onQuran={() => setView('quran')}
+                onDuas={() => setView('duas')}
+                onSahabiyat={() => setView('sahabiyat')}
+                onJournal={() => setView('journal')}
+              />
+            );
+          case 'topic':
+            return <TopicView topic={selectedTopic} onBack={() => { setView('home'); setSelectedTopic(null); }} onExplain={setExplainHadith} />;
+          case 'ask':
+            return <AskSafely onBack={() => setView('home')} />;
+          case 'culture':
+            return <CultureVsIslamView onBack={() => setView('home')} />;
+          case 'quran':
+            return <QuranView onBack={() => setView('home')} />;
+          case 'duas':
+            return <DuasView onBack={() => setView('home')} />;
+          case 'sahabiyat':
+            return <SahabiyatView onBack={() => setView('home')} />;
+          case 'journal':
+            return <Journal onBack={() => setView('home')} />;
+          case 'dhikr':
+            return <DhikrCounter onBack={() => { setView('home'); setActiveTab('home'); }} />;
+          case 'saved':
+            return <SavedView onBack={() => { setView('home'); setActiveTab('home'); }} />;
+          case 'settings':
+            return <Settings onBack={() => { setView('home'); setActiveTab('home'); }} />;
+          default:
+            return <HomeScreen />;
+        }
+      };
+
+      return (
+        <div className="max-w-lg mx-auto">
+          {renderContent()}
+          <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
+          {explainHadith && <ExplanationModal hadith={explainHadith} onClose={() => setExplainHadith(null)} />}
+        </div>
+      );
+    }
+
+    function App() {
+      return (
+        <AppProvider>
+          <AppContent />
+        </AppProvider>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
 </html>
