@@ -11,15 +11,17 @@ export function Button({
 }) {
   const variants = {
     primary:
-      'bg-neutral-800 dark:bg-emerald-600 text-white active:bg-neutral-700 dark:active:bg-emerald-700',
+      'bg-gradient-to-r from-pink-500 to-pink-600 text-white shadow-pink-md hover:shadow-pink-lg active:from-pink-600 active:to-pink-700 btn-glow',
     secondary:
-      'bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-200 active:bg-neutral-200 dark:active:bg-neutral-600',
+      'bg-pink-50 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300 border border-pink-200 dark:border-pink-800 active:bg-pink-100 dark:active:bg-pink-900/50',
     ghost:
-      'bg-transparent text-neutral-600 dark:text-neutral-300 active:bg-neutral-100 dark:active:bg-neutral-700',
-    emerald:
-      'bg-emerald-600 text-white active:bg-emerald-700',
+      'bg-transparent text-pink-600 dark:text-pink-400 active:bg-pink-50 dark:active:bg-pink-900/30',
+    pink:
+      'bg-pink-600 text-white shadow-pink active:bg-pink-700',
     danger:
-      'bg-rose-600 text-white active:bg-rose-700',
+      'bg-rose-500 text-white shadow-sm active:bg-rose-600',
+    soft:
+      'bg-pink-100 dark:bg-pink-900/40 text-pink-700 dark:text-pink-300 active:bg-pink-200 dark:active:bg-pink-900/60',
   };
 
   const sizes = {
@@ -34,7 +36,7 @@ export function Button({
       disabled={disabled}
       className={`
         inline-flex items-center justify-center gap-2
-        rounded-xl font-medium transition-colors
+        rounded-2xl font-medium transition-all duration-200
         disabled:opacity-40 disabled:cursor-not-allowed
         ${variants[variant]}
         ${sizes[size]}

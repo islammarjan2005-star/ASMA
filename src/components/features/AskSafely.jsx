@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronLeft, Lock, Send, Phone, Heart } from 'lucide-react';
+import { ChevronLeft, Lock, Send, Phone, Heart, Sparkles } from 'lucide-react';
 import { Card, Button, Input } from '../ui';
 import { callClaude } from '../../utils/api';
 import { crisisKeywords } from '../../data';
@@ -65,60 +65,60 @@ Remember: asking questions is a sign of engaged faith, not doubt. Please try aga
   };
 
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 flex flex-col">
+    <div className="min-h-screen flex flex-col animate-page-in">
       {/* Crisis Modal */}
       {showCrisis && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <Card className="p-6 max-w-sm w-full">
-            <div className="w-12 h-12 bg-rose-50 dark:bg-rose-900/50 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Heart className="w-6 h-6 text-rose-500" />
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <Card className="p-6 max-w-sm w-full" variant="glass">
+            <div className="w-12 h-12 bg-gradient-to-br from-pink-400 to-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-pink-md animate-breathe">
+              <Heart className="w-6 h-6 text-white" />
             </div>
-            <h3 className="text-xl font-medium text-center text-neutral-800 dark:text-neutral-100 mb-2">
+            <h3 className="text-xl font-semibold text-center text-pink-900 dark:text-pink-100 mb-2">
               You Are Not Alone
             </h3>
-            <p className="text-neutral-500 dark:text-neutral-400 text-center text-sm mb-6">
+            <p className="text-pink-500 dark:text-pink-400 text-center text-sm mb-6">
               It sounds like you may be going through something difficult. Please reach out to
               someone who can help.
             </p>
             <div className="space-y-3 mb-6">
               <a
                 href="tel:988"
-                className="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-neutral-800 rounded-xl"
+                className="flex items-center gap-3 p-3 bg-pink-50 dark:bg-pink-900/30 rounded-xl border border-pink-200 dark:border-pink-800"
               >
-                <Phone className="w-5 h-5 text-neutral-600 dark:text-neutral-300" />
+                <Phone className="w-5 h-5 text-pink-600 dark:text-pink-400" />
                 <div>
-                  <p className="font-medium text-neutral-700 dark:text-neutral-200 text-sm">
+                  <p className="font-medium text-pink-900 dark:text-pink-100 text-sm">
                     988 Crisis Lifeline
                   </p>
-                  <p className="text-xs text-neutral-400">Call or text anytime</p>
+                  <p className="text-xs text-pink-400">Call or text anytime</p>
                 </div>
               </a>
               <a
                 href="tel:18007997233"
-                className="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-neutral-800 rounded-xl"
+                className="flex items-center gap-3 p-3 bg-pink-50 dark:bg-pink-900/30 rounded-xl border border-pink-200 dark:border-pink-800"
               >
-                <Phone className="w-5 h-5 text-neutral-600 dark:text-neutral-300" />
+                <Phone className="w-5 h-5 text-pink-600 dark:text-pink-400" />
                 <div>
-                  <p className="font-medium text-neutral-700 dark:text-neutral-200 text-sm">
+                  <p className="font-medium text-pink-900 dark:text-pink-100 text-sm">
                     National DV Hotline
                   </p>
-                  <p className="text-xs text-neutral-400">1-800-799-7233</p>
+                  <p className="text-xs text-pink-400">1-800-799-7233</p>
                 </div>
               </a>
               <a
                 href="tel:18666274448"
-                className="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-neutral-800 rounded-xl"
+                className="flex items-center gap-3 p-3 bg-pink-50 dark:bg-pink-900/30 rounded-xl border border-pink-200 dark:border-pink-800"
               >
-                <Phone className="w-5 h-5 text-neutral-600 dark:text-neutral-300" />
+                <Phone className="w-5 h-5 text-pink-600 dark:text-pink-400" />
                 <div>
-                  <p className="font-medium text-neutral-700 dark:text-neutral-200 text-sm">
+                  <p className="font-medium text-pink-900 dark:text-pink-100 text-sm">
                     NASEEHA Muslim Helpline
                   </p>
-                  <p className="text-xs text-neutral-400">1-866-627-3342</p>
+                  <p className="text-xs text-pink-400">1-866-627-3342</p>
                 </div>
               </a>
             </div>
-            <p className="text-xs text-neutral-400 text-center mb-4 italic">
+            <p className="text-xs text-pink-400 text-center mb-4 italic font-elegant">
               "Say: O My servants who have transgressed against themselves, do not despair of the
               mercy of Allah." — Quran 39:53
             </p>
@@ -133,25 +133,26 @@ Remember: asking questions is a sign of engaged faith, not doubt. Please try aga
       <div className="p-5 pt-12 max-w-lg mx-auto w-full">
         <button
           onClick={onBack}
-          className="flex items-center gap-2 text-neutral-400 mb-6 active:text-neutral-600 transition-colors"
+          className="flex items-center gap-2 text-pink-400 mb-6 active:text-pink-600 transition-colors"
         >
           <ChevronLeft className="w-5 h-5" />
-          <span className="text-sm">Back</span>
+          <span className="text-sm font-medium">Back</span>
         </button>
 
-        <Card className="p-5 mb-6">
+        <Card className="p-5 mb-6" variant="glass">
           <div className="flex items-center gap-4 mb-3">
-            <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-900/50 rounded-xl flex items-center justify-center">
-              <Lock className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+            <div className="w-12 h-12 bg-gradient-to-br from-pink-400 to-pink-600 rounded-xl flex items-center justify-center shadow-pink">
+              <Lock className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-medium text-neutral-800 dark:text-neutral-100">
+              <h1 className="text-xl font-semibold text-pink-900 dark:text-pink-100 flex items-center gap-2">
                 Ask Safely
+                <Sparkles className="w-4 h-4 text-pink-400" />
               </h1>
-              <p className="text-sm text-neutral-400">Private. No judgment.</p>
+              <p className="text-sm text-pink-400">Private. No judgment.</p>
             </div>
           </div>
-          <p className="text-neutral-500 dark:text-neutral-400 text-sm leading-relaxed">
+          <p className="text-pink-500 dark:text-pink-400 text-sm leading-relaxed">
             Ask any question about your faith. I'll respond with warmth, clarity, and proper
             sources.
           </p>
@@ -162,7 +163,7 @@ Remember: asking questions is a sign of engaged faith, not doubt. Please try aga
       <div className="flex-1 overflow-y-auto px-5 max-w-lg mx-auto w-full">
         {conversation.length === 0 && !loading && (
           <div className="mb-6">
-            <p className="text-xs font-medium text-neutral-400 uppercase tracking-wide mb-3">
+            <p className="text-xs font-semibold text-pink-500 uppercase tracking-wider mb-3">
               Try asking
             </p>
             <div className="flex flex-wrap gap-2">
@@ -170,7 +171,7 @@ Remember: asking questions is a sign of engaged faith, not doubt. Please try aga
                 <button
                   key={i}
                   onClick={() => setQuestion(s)}
-                  className="px-3 py-2 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg text-sm text-neutral-600 dark:text-neutral-300 active:bg-neutral-50 dark:active:bg-neutral-700 transition-colors"
+                  className="px-3 py-2 bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm border border-pink-200 dark:border-pink-800 rounded-xl text-sm text-pink-700 dark:text-pink-300 active:bg-pink-50 dark:active:bg-pink-900/30 transition-all duration-200 shadow-pink-sm"
                 >
                   {s}
                 </button>
@@ -184,15 +185,15 @@ Remember: asking questions is a sign of engaged faith, not doubt. Please try aga
             <div
               className={`max-w-[85%] p-4 rounded-2xl ${
                 msg.role === 'user'
-                  ? 'bg-neutral-800 dark:bg-emerald-600 text-white rounded-br-md'
-                  : 'bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-bl-md'
+                  ? 'bg-gradient-to-r from-pink-500 to-pink-600 text-white rounded-br-md shadow-pink'
+                  : 'bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm border border-pink-200 dark:border-pink-800 rounded-bl-md'
               }`}
             >
               <p
                 className={`text-sm leading-relaxed whitespace-pre-line ${
                   msg.role === 'user'
                     ? 'text-white'
-                    : 'text-neutral-600 dark:text-neutral-300'
+                    : 'text-pink-700 dark:text-pink-300'
                 }`}
               >
                 {msg.content}
@@ -203,15 +204,15 @@ Remember: asking questions is a sign of engaged faith, not doubt. Please try aga
 
         {loading && (
           <div className="mb-4">
-            <div className="max-w-[85%] p-4 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-2xl rounded-bl-md">
+            <div className="max-w-[85%] p-4 bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm border border-pink-200 dark:border-pink-800 rounded-2xl rounded-bl-md">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                <div className="w-2 h-2 bg-pink-500 rounded-full animate-pulse" />
                 <div
-                  className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"
+                  className="w-2 h-2 bg-pink-500 rounded-full animate-pulse"
                   style={{ animationDelay: '0.2s' }}
                 />
                 <div
-                  className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"
+                  className="w-2 h-2 bg-pink-500 rounded-full animate-pulse"
                   style={{ animationDelay: '0.4s' }}
                 />
               </div>
@@ -222,7 +223,7 @@ Remember: asking questions is a sign of engaged faith, not doubt. Please try aga
       </div>
 
       {/* Input area */}
-      <div className="p-5 border-t border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 max-w-lg mx-auto w-full">
+      <div className="p-5 pb-28 border-t border-pink-100 dark:border-pink-900/30 bg-white/90 dark:bg-neutral-800/90 backdrop-blur-sm max-w-lg mx-auto w-full">
         <div className="flex gap-3">
           <Input
             value={question}
@@ -239,7 +240,7 @@ Remember: asking questions is a sign of engaged faith, not doubt. Please try aga
             <Send className="w-5 h-5" />
           </Button>
         </div>
-        <p className="text-xs text-neutral-400 text-center mt-3">
+        <p className="text-xs text-pink-400 text-center mt-3">
           Educational guidance only — not a fatwa
         </p>
       </div>
