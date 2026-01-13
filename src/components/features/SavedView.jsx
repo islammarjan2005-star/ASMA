@@ -22,7 +22,7 @@ export function SavedView({ onBack, onSelectHadith }) {
     savedHadithItems.length + savedVerseItems.length + savedDuaItems.length;
 
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 pb-24">
+    <div className="min-h-screen bg-gradient-to-b from-pink-50/30 to-white dark:from-neutral-900 dark:to-neutral-900 pb-24">
       <div className="p-5 pt-12 max-w-lg mx-auto">
         {/* Header */}
         <button
@@ -57,7 +57,7 @@ export function SavedView({ onBack, onSelectHadith }) {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex-1 py-3 rounded-xl flex items-center justify-center gap-2 text-sm font-medium transition-colors ${
                   activeTab === tab.id
-                    ? 'bg-neutral-800 dark:bg-emerald-600 text-white'
+                    ? 'bg-neutral-800 dark:bg-pink-600 text-white'
                     : 'bg-white dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700'
                 }`}
               >
