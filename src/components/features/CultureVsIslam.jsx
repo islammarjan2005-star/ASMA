@@ -12,7 +12,7 @@ export function CultureVsIslam({ onBack }) {
     : cultureVsIslam;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-pink-50/30 to-white dark:from-neutral-900 dark:to-neutral-900 pb-24">
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 pb-24">
       <div className="p-5 pt-12 max-w-lg mx-auto">
         {/* Header */}
         <button
@@ -98,11 +98,11 @@ export function CultureVsIslam({ onBack }) {
               {expanded === item.id && (
                 <div className="px-4 pb-4 border-t border-neutral-100 dark:border-neutral-700 pt-4 animate-fade-in">
                   <div className="flex items-start gap-3 mb-4">
-                    <div className="w-6 h-6 bg-pink-50 dark:bg-pink-900/50 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <CheckCircle className="w-3 h-3 text-pink-500" />
+                    <div className="w-6 h-6 bg-emerald-50 dark:bg-emerald-900/50 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <CheckCircle className="w-3 h-3 text-emerald-500" />
                     </div>
                     <div>
-                      <p className="text-xs font-medium text-pink-600 dark:text-pink-400 mb-1">
+                      <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 mb-1">
                         What Islam Says
                       </p>
                       <p className="text-neutral-600 dark:text-neutral-300 text-sm">
@@ -113,7 +113,7 @@ export function CultureVsIslam({ onBack }) {
                   </div>
 
                   {item.explanation && (
-                    <div className="p-3 bg-gradient-to-b from-pink-50/30 to-white dark:from-neutral-900 dark:to-neutral-900 rounded-xl">
+                    <div className="p-3 bg-neutral-50 dark:bg-neutral-900 rounded-xl">
                       <p className="text-xs font-medium text-neutral-400 mb-1">More Context</p>
                       <p className="text-neutral-600 dark:text-neutral-300 text-sm leading-relaxed">
                         {item.explanation}

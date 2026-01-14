@@ -12,7 +12,7 @@ export function TopicView({ topic, onBack, onExplain }) {
   const TopicIcon = Icons[topic.icon] || Icons.Circle;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-pink-50/30 to-white dark:from-neutral-900 dark:to-neutral-900 pb-24">
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 pb-24">
       <div className="p-5 pt-12 max-w-lg mx-auto">
         {/* Header */}
         <button
@@ -25,8 +25,8 @@ export function TopicView({ topic, onBack, onExplain }) {
 
         {/* Topic Header */}
         <div className="flex items-center gap-4 mb-8">
-          <div className="w-14 h-14 bg-pink-50 dark:bg-pink-900/50 rounded-2xl flex items-center justify-center">
-            <TopicIcon className="w-7 h-7 text-pink-600 dark:text-pink-400" />
+          <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-900/50 rounded-2xl flex items-center justify-center">
+            <TopicIcon className="w-7 h-7 text-emerald-600 dark:text-emerald-400" />
           </div>
           <div>
             <h1 className="text-2xl font-medium text-neutral-800 dark:text-neutral-100">
