@@ -473,6 +473,16 @@ ui <- fluidPage(
               div(class = "govuk-hint", "Auto-selected from latest available data"),
               uiOutput("month_status")
             ),
+          )
+        )
+      ),
+
+
+      # Vacancies & Payroll
+      div(class = "dashboard-card",
+        div(class = "dashboard-card__header", "Vacancies & Payroll"),
+        div(class = "dashboard-card__content",
+          div(class = "input-row",
             div(class = "govuk-form-group",
               tags$label(class = "govuk-label", `for` = "vacancies_period", "Vacancies"),
               selectInput("vacancies_period", label = NULL, choices = c("Loading" = "Loading"), selected = "Loading")
@@ -484,7 +494,6 @@ ui <- fluidPage(
           )
         )
       ),
-
       # Actions
       div(class = "dashboard-card",
         div(class = "dashboard-card__header", "Actions"),
@@ -730,10 +739,10 @@ server <- function(input, output, session) {
   # Reference month display
   output$month_status <- renderUI({
     mm <- reference_manual_month()
-    div(style = "margin-top: 10px;",
-      span(class = "govuk-tag govuk-tag--green", "AUTO"),
-      span(style = "margin-left: 10px; font-weight: 600;", manual_month_to_display(mm))
-    )
+    if (is.null(mm) || !nzchar(mm)) {
+      return(div(style = "margin-top: 10px;", div(class = "loader")))
+    }
+    div(style = "margin-top: 10px; font-weight: 600;", manual_month_to_display(mm))
   })
 
 
