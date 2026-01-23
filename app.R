@@ -482,6 +482,8 @@ ui <- fluidPage(
               selectInput("payroll_period", label = NULL, choices = c("Loading" = "Loading"), selected = "Loading")
             )
           )
+        )
+      ),
 
       # Actions
       div(class = "dashboard-card",
@@ -499,9 +501,7 @@ ui <- fluidPage(
           downloadButton("download_word", "Download Word Document", class = "govuk-button"),
           downloadButton("download_excel", "Download Excel Workbook", class = "govuk-button govuk-button--secondary")
         )
-      ),
-
-      # Preview sections moved below (full-width)
+      )
     )
   ),
 
@@ -950,7 +950,11 @@ server <- function(input, output, session) {
             summary_path = summary_path,
             top_ten_path = top_ten_path,
             manual_month_override = month_override,
-            vac_payroll_mode_override = both_mode, type = "error", duration = 5)
+            vac_payroll_mode_override = both_mode
+          )
+        }, error = function(e) {
+          showNotification(paste("Word error:", e$message), type = "error", duration = 5)
+          stop(e)
         })
       })
 
