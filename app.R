@@ -6,7 +6,6 @@
 # ==============================================================================
 
 library(shiny)
-library(lubridate)
 
 # ==============================================================================
 # UI - GOV.UK DESIGN SYSTEM
@@ -403,6 +402,40 @@ ui <- fluidPage(
       .shiny-notification-close {
         display: none;
       }
+
+      /* Loading spinner (used during auto reference-month detection) */
+      .loader {
+        border: 4px solid #f3f2f1;
+        border-top: 4px solid #1d70b8;
+        border-radius: 50%;
+        width: 28px;
+        height: 28px;
+        animation: spin 0.9s linear infinite;
+        display: inline-block;
+        vertical-align: middle;
+        margin-right: 12px;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+
+      /* Ensure Shiny selectInput matches GOV.UK style */
+      #vacancies_period, #payroll_period {
+        font-size: 19px;
+        width: 100%;
+        max-width: 320px;
+        height: 40px;
+        padding: 5px;
+        border: 2px solid #0b0c0c;
+        border-radius: 0;
+        background-color: #ffffff;
+      }
+      #vacancies_period:focus, #payroll_period:focus {
+        outline: 3px solid #ffdd00;
+        outline-offset: 0;
+        box-shadow: inset 0 0 0 2px;
+      }
     "))
   ),
 
@@ -436,20 +469,19 @@ ui <- fluidPage(
         div(class = "dashboard-card__content",
           div(class = "input-row",
             div(class = "govuk-form-group",
-              tags$label(class = "govuk-label", `for` = "auto_month", "Reference month"),
-              uiOutput("auto_month_display")
+              tags$label(class = "govuk-label", "Reference month"),
+              div(class = "govuk-hint", "Auto-selected from latest available data"),
+              uiOutput("month_status")
             ),
             div(class = "govuk-form-group",
-              tags$label(class = "govuk-label", `for` = "vacancies_mode", "Vacancies"),
-              uiOutput("vacancies_select_ui")
+              tags$label(class = "govuk-label", `for` = "vacancies_period", "Vacancies"),
+              selectInput("vacancies_period", label = NULL, choices = c("Loading" = "Loading"), selected = "Loading")
             ),
             div(class = "govuk-form-group",
-              tags$label(class = "govuk-label", `for` = "payroll_mode", "Payroll employees"),
-              uiOutput("payroll_select_ui")
+              tags$label(class = "govuk-label", `for` = "payroll_period", "Payroll employees"),
+              selectInput("payroll_period", label = NULL, choices = c("Loading" = "Loading"), selected = "Loading")
             )
           )
-        )
-      ),
 
       # Actions
       div(class = "dashboard-card",
@@ -510,215 +542,201 @@ server <- function(input, output, session) {
   top_ten_path      <- "sheets/top_ten_stats.R"
   template_path     <- "utils/DB.docx"
 
-  # Reactive values
+    # Reactive values
   dashboard_data <- reactiveVal(NULL)
   topten_data <- reactiveVal(NULL)
 
-  # Auto reference month (derived from latest LFS quarter in the database)
-  auto_ref <- reactiveVal(NULL)  # list(manual_month = "dec2025", month_label = "Dec 2025", lfs_end = as.Date("2025-10-01"))
+  reference_manual_month <- reactiveVal(NULL)
+  period_labels <- reactiveVal(list(
+    vac = list(aligned = NULL, latest = NULL),
+    payroll = list(aligned = NULL, latest = NULL)
+  ))
 
-  # Dynamic dropdown labels (shown to users)
-  vac_choice_labels <- reactiveVal(list(latest = "", aligned = ""))
-  payroll_choice_labels <- reactiveVal(list(latest = "", aligned = ""))
-
-  # --- helpers (UI labels) ----------------------------------------------------
-
-  fmt_quarter_label <- function(end_date) {
-    start_date <- end_date %m-% months(2)
-    sprintf("%s - %s %s", format(start_date, "%b"), format(end_date, "%b"), format(end_date, "%Y"))
+  # ---------- small date helpers (no extra packages) ----------
+  add_months <- function(d, n) {
+    d <- as.Date(d)
+    if (is.na(d)) return(as.Date(NA))
+    if (n == 0) return(d)
+    if (n > 0) return(as.Date(seq(d, by = "month", length.out = n + 1)[n + 1]))
+    as.Date(seq(d, by = paste0(n, " months"), length.out = 2)[2])
   }
 
-  parse_lfs_end_date <- function(label) {
-    # Parse "Jul-Sep 2025" -> 2025-09-01
-    months3 <- regmatches(label, gregexpr("[A-Za-z]{3}", label))[[1]]
-    yrs <- regmatches(label, gregexpr("[0-9]{4}", label))[[1]]
-    if (length(months3) >= 2 && length(yrs) >= 1) {
-      end_m <- match(tolower(months3[2]), tolower(month.abb))
-      yr <- suppressWarnings(as.integer(yrs[1]))
-      if (!is.na(end_m) && !is.na(yr)) {
-        return(as.Date(sprintf("%04d-%02d-01", yr, end_m)))
-      }
+  parse_lfs_end <- function(label) {
+    x <- trimws(as.character(label))
+    month_map <- c(jan=1,feb=2,mar=3,apr=4,may=5,jun=6,jul=7,aug=8,sep=9,oct=10,nov=11,dec=12)
+    months_found <- regmatches(x, gregexpr("[A-Za-z]{3}", x))[[1]]
+    year_found <- regmatches(x, gregexpr("[0-9]{4}", x))[[1]]
+    if (length(months_found) >= 2 && length(year_found) >= 1) {
+      end_month <- month_map[tolower(months_found[2])]
+      yr <- as.integer(year_found[1])
+      if (!is.na(end_month) && !is.na(yr)) return(as.Date(sprintf("%04d-%02d-01", yr, end_month)))
     }
     as.Date(NA)
   }
 
-  fmt_lfs_period_ui <- function(label) {
-    # "Jul-Sep 2025" -> "Jul - Sep 2025"
-    lbl <- trimws(label)
-    sub("^([A-Za-z]{3})-([A-Za-z]{3})[[:space:]]+([0-9]{4})$", "\\1 - \\2 \\3", lbl)
+  manual_month_from_date <- function(d) {
+    tolower(paste0(format(d, "%b"), format(d, "%Y")))
   }
 
-  parse_manual_month_simple <- function(mm) {
-    mm <- tolower(gsub("[[:space:]]+", "", mm))
+  manual_month_to_display <- function(mm) {
+    # mm like "dec2025" -> "December 2025"
+    mm <- tolower(gsub("[[:space:]]+", "", as.character(mm)))
     mon3 <- substr(gsub("[^a-z]", "", mm), 1, 3)
-    yr <- suppressWarnings(as.integer(substr(gsub("[^0-9]", "", mm), 1, 4)))
+    yr <- as.integer(substr(gsub("[^0-9]", "", mm), 1, 4))
     m <- match(mon3, tolower(month.abb))
-    if (is.na(m) || is.na(yr)) return(as.Date(NA))
-    as.Date(sprintf("%04d-%02d-01", yr, m))
+    if (is.na(m) || is.na(yr)) return(mm)
+    format(as.Date(sprintf("%04d-%02d-01", yr, m)), "%B %Y")
   }
 
-  compute_auto_ref <- function() {
+  mode_from_choice <- function(choice, labs) {
+    if (!is.null(labs$latest) && identical(choice, labs$latest)) "latest" else "aligned"
+  }
 
-    # fallback from config
-    fallback_mm <- NULL
-    if (file.exists(config_path)) {
+  # ---------- auto-detect reference month + dropdown options ----------
+  session$onFlushed(function() {
+
+    showModal(modalDialog(
+      div(
+        div(class = "loader"),
+        strong("Loading…"),
+        div(style = "margin-top: 8px; color: #505a5f;", "Detecting latest reference month and periods")
+      ),
+      footer = NULL, easyClose = FALSE
+    ))
+
+    mm <- NULL
+
+    # 1) Try DB (LFS age_group table) for latest LFS period
+    if (requireNamespace("DBI", quietly = TRUE) && requireNamespace("RPostgres", quietly = TRUE)) {
+      conn <- NULL
       tryCatch({
-        env_cfg <- new.env()
-        source(config_path, local = env_cfg)
-        if (exists("manual_month", envir = env_cfg)) fallback_mm <- as.character(env_cfg$manual_month)
+        conn <- DBI::dbConnect(RPostgres::Postgres())
+        res <- DBI::dbGetQuery(conn, 'SELECT DISTINCT time_period FROM "ons"."labour_market__age_group"')
+        if (nrow(res) > 0) {
+          ends <- as.Date(vapply(res$time_period, parse_lfs_end, as.Date(NA)), origin = "1970-01-01")
+          if (any(!is.na(ends))) {
+            end_latest <- max(ends, na.rm = TRUE)
+            mm_date <- add_months(end_latest, 2)
+            mm <- manual_month_from_date(mm_date)
+          }
+        }
+      }, error = function(e) NULL, finally = {
+        if (!is.null(conn)) try(DBI::dbDisconnect(conn), silent = TRUE)
+      })
+    }
+
+    # 2) Fallback: config.R
+    if (is.null(mm) && file.exists(config_path)) {
+      env <- new.env()
+      tryCatch({
+        source(config_path, local = env)
+        if (exists("manual_month", envir = env)) mm <- tolower(env$manual_month)
       }, error = function(e) NULL)
     }
 
-    # prefer database latest LFS period
-    tryCatch({
-      env <- new.env()
-      source("utils/helpers.R", local = env)
-      source("sheets/lfs.R", local = env)
+    if (is.null(mm) || !nzchar(mm)) {
+      mm <- manual_month_from_date(Sys.Date())
+    }
 
-      pg <- env$fetch_lfs()
-      if (is.null(pg) || nrow(pg) == 0) stop("LFS fetch returned 0 rows")
+    reference_manual_month(mm)
 
-      end_dates <- vapply(pg$time_period, parse_lfs_end_date, as.Date(NA))
-      if (all(is.na(end_dates))) stop("No parsable LFS time_period values found")
-
-      latest_end <- max(end_dates, na.rm = TRUE)
-      mm_date <- latest_end %m+% months(2)
-
-      mm <- paste0(tolower(format(mm_date, "%b")), format(mm_date, "%Y"))
-      list(
-        manual_month = mm,
-        month_label = format(mm_date, "%b %Y"),
-        lfs_end = latest_end
-      )
-
-    }, error = function(e) {
-
-      # fallback: config -> today
-      if (!is.null(fallback_mm) && nzchar(fallback_mm)) {
-        mm_date <- parse_manual_month_simple(fallback_mm)
-        if (!is.na(mm_date)) {
-          return(list(
-            manual_month = tolower(fallback_mm),
-            month_label = format(mm_date, "%b %Y"),
-            lfs_end = mm_date %m-% months(2)
-          ))
-        }
-      }
-
-      # final fallback
-      list(
-        manual_month = paste0(tolower(format(Sys.Date(), "%b")), format(Sys.Date(), "%Y")),
-        month_label = format(Sys.Date(), "%b %Y"),
-        lfs_end = as.Date(NA)
-      )
-    })
-  }
-
-  # Compute auto reference once per session
-  observe({
-    if (!is.null(auto_ref())) return()
-    auto_ref(compute_auto_ref())
-  })
-
-  # Build dropdown labels once we know the dashboard quarter end
-  observeEvent(auto_ref(), {
-    ref <- auto_ref()
-    if (is.null(ref)) return()
-
-    target_end <- ref$lfs_end
+    # Compute dashboard quarter end (manual_month - 2 months)
+    # manual_month is always the 1st of month
+    mm_mon3 <- substr(gsub("[^a-z]", "", mm), 1, 3)
+    mm_yr <- as.integer(substr(gsub("[^0-9]", "", mm), 1, 4))
+    mm_m <- match(mm_mon3, tolower(month.abb))
+    mm_date <- as.Date(sprintf("%04d-%02d-01", mm_yr, mm_m))
+    lfs_end <- add_months(mm_date, -2)
 
     # Vacancies labels
-    tryCatch({
-      envv <- new.env()
-      source("utils/helpers.R", local = envv)
-      source("sheets/vacancies.R", local = envv)
-      pg <- envv$fetch_vacancies()
+    vac_lab_aligned <- ""
+    vac_lab_latest <- ""
+    if (requireNamespace("DBI", quietly = TRUE) && requireNamespace("RPostgres", quietly = TRUE)) {
+      conn <- NULL
+      tryCatch({
+        conn <- DBI::dbConnect(RPostgres::Postgres())
+        res <- DBI::dbGetQuery(conn, 'SELECT DISTINCT time_period FROM "ons"."labour_market__vacancies_business"')
+        if (nrow(res) > 0) {
+          ends <- as.Date(vapply(res$time_period, parse_lfs_end, as.Date(NA)), origin = "1970-01-01")
+          ok <- !is.na(ends)
+          if (any(ok)) {
+            end_latest <- max(ends[ok], na.rm = TRUE)
+            end_aligned_candidates <- ends[ok & ends <= lfs_end]
+            end_aligned <- if (length(end_aligned_candidates) >= 1) max(end_aligned_candidates) else end_latest
 
-      vac_rows <- pg[pg$dataset_indentifier_code == envv$VAC_CODES$VAC, , drop = FALSE]
-      if (nrow(vac_rows) >= 1) {
-        dates <- as.Date(sapply(vac_rows$time_period, envv$parse_lfs_label_to_date), origin = "1970-01-01")
-        o <- order(dates, decreasing = TRUE, na.last = TRUE)
-        vac_rows <- vac_rows[o, , drop = FALSE]
-        dates <- dates[o]
-
-        latest_lbl <- fmt_lfs_period_ui(vac_rows$time_period[1])
-
-        pick <- 1
-        if (!is.na(target_end)) {
-          idx_exact <- which(dates == target_end)
-          if (length(idx_exact) >= 1) {
-            pick <- idx_exact[1]
-          } else {
-            idx_le <- which(dates <= target_end)
-            pick <- if (length(idx_le) >= 1) idx_le[1] else 1
+            # Recreate labels (ensure they exist in DB format)
+            make_lfs_label_local <- function(end_date) {
+              start_date <- add_months(end_date, -2)
+              paste0(format(start_date, "%b"), "-", format(end_date, "%b"), " ", format(end_date, "%Y"))
+            }
+            vac_lab_aligned <- make_lfs_label_local(end_aligned)
+            vac_lab_latest  <- make_lfs_label_local(end_latest)
           }
         }
+      }, error = function(e) NULL, finally = {
+        if (!is.null(conn)) try(DBI::dbDisconnect(conn), silent = TRUE)
+      })
+    }
 
-        aligned_lbl <- fmt_lfs_period_ui(vac_rows$time_period[pick])
-        vac_choice_labels(list(latest = latest_lbl, aligned = aligned_lbl))
-      }
-    }, error = function(e) NULL)
+    # Payroll labels (3-month window, displayed as LFS-style quarter)
+    pay_lab_aligned <- ""
+    pay_lab_latest <- ""
+    if (requireNamespace("DBI", quietly = TRUE) && requireNamespace("RPostgres", quietly = TRUE)) {
+      conn <- NULL
+      tryCatch({
+        conn <- DBI::dbConnect(RPostgres::Postgres())
+        res <- DBI::dbGetQuery(conn, 'SELECT DISTINCT time_period FROM "ons"."labour_market__payrolled_employees"')
+        if (nrow(res) > 0) {
+          months <- suppressWarnings(as.Date(paste0("01 ", res$time_period), format = "%d %B %Y"))
+          ok <- !is.na(months)
+          if (any(ok)) {
+            end_latest <- max(months[ok], na.rm = TRUE)
+            end_aligned_candidates <- months[ok & months <= lfs_end]
+            end_aligned <- if (length(end_aligned_candidates) >= 1) max(end_aligned_candidates) else end_latest
 
-    # Payroll labels (3-month "quarter" windows)
-    tryCatch({
-      envp <- new.env()
-      source("utils/helpers.R", local = envp)
-      source("sheets/payroll.R", local = envp)
-      pg <- envp$fetch_payroll()
-
-      pr <- pg[pg$unit_type == envp$PAYROLL_UNIT_TYPE, , drop = FALSE]
-      if (nrow(pr) >= 3) {
-        dates <- as.Date(paste0("01 ", pr$time_period), format = "%d %B %Y")
-        o <- order(dates, decreasing = TRUE, na.last = TRUE)
-        dates <- dates[o]
-
-        latest_anchor <- dates[1]
-
-        aligned_anchor <- latest_anchor
-        if (!is.na(target_end)) {
-          idx_le <- which(dates <= target_end)
-          aligned_anchor <- if (length(idx_le) >= 1) dates[idx_le[1]] else latest_anchor
+            make_lfs_label_local <- function(end_date) {
+              start_date <- add_months(end_date, -2)
+              paste0(format(start_date, "%b"), "-", format(end_date, "%b"), " ", format(end_date, "%Y"))
+            }
+            pay_lab_aligned <- make_lfs_label_local(end_aligned)
+            pay_lab_latest  <- make_lfs_label_local(end_latest)
+          }
         }
+      }, error = function(e) NULL, finally = {
+        if (!is.null(conn)) try(DBI::dbDisconnect(conn), silent = TRUE)
+      })
+    }
 
-        payroll_choice_labels(list(
-          latest = fmt_quarter_label(latest_anchor),
-          aligned = fmt_quarter_label(aligned_anchor)
-        ))
-      }
-    }, error = function(e) NULL)
+    # Store + update dropdowns (only the two options, no extra words)
+    period_labels(list(
+      vac = list(aligned = vac_lab_aligned, latest = vac_lab_latest),
+      payroll = list(aligned = pay_lab_aligned, latest = pay_lab_latest)
+    ))
 
-  }, ignoreInit = FALSE)
+    if (nzchar(vac_lab_aligned) && nzchar(vac_lab_latest)) {
+      updateSelectInput(session, "vacancies_period",
+                        choices = c(vac_lab_aligned, vac_lab_latest),
+                        selected = vac_lab_aligned)
+    }
+    if (nzchar(pay_lab_aligned) && nzchar(pay_lab_latest)) {
+      updateSelectInput(session, "payroll_period",
+                        choices = c(pay_lab_aligned, pay_lab_latest),
+                        selected = pay_lab_aligned)
+    }
 
-  # Display auto reference month (no manual input)
-  output$auto_month_display <- renderUI({
-    ref <- auto_ref()
-    if (is.null(ref)) return(div(class = "govuk-hint", ""))
-    div(style = "font-weight: 600;", ref$month_label)
-  })
+    removeModal()
+  }, once = TRUE)
 
-  # Vacancies dropdown (two options: latest vs aligned)
-  output$vacancies_select_ui <- renderUI({
-    labs <- vac_choice_labels()
-    tags$select(
-      class = "govuk-select",
-      id = "vacancies_mode",
-      name = "vacancies_mode",
-      tags$option(value = "latest", labs$latest),
-      tags$option(value = "aligned", labs$aligned)
+  # Reference month display
+  output$month_status <- renderUI({
+    mm <- reference_manual_month()
+    div(style = "margin-top: 10px;",
+      span(class = "govuk-tag govuk-tag--green", "AUTO"),
+      span(style = "margin-left: 10px; font-weight: 600;", manual_month_to_display(mm))
     )
   })
 
-  # Payroll dropdown (two options: latest vs aligned)
-  output$payroll_select_ui <- renderUI({
-    labs <- payroll_choice_labels()
-    tags$select(
-      class = "govuk-select",
-      id = "payroll_mode",
-      name = "payroll_mode",
-      tags$option(value = "latest", labs$latest),
-      tags$option(value = "aligned", labs$aligned)
-    )
-  })
+
 # ============================================================================
   # PREVIEW: DASHBOARD
   # ============================================================================
@@ -747,25 +765,15 @@ server <- function(input, output, session) {
       incProgress(0.15, detail = "Step 3/6: Setting reference month...")
       Sys.sleep(0.2)
 
-      ref <- auto_ref()
-      if (!is.null(ref) && !is.null(ref$manual_month) && nzchar(ref$manual_month)) {
-        calc_env$manual_month <- ref$manual_month
+      mm <- reference_manual_month()
+      if (!is.null(mm) && nzchar(mm)) {
+        calc_env$manual_month <- tolower(mm)
       }
 
-      vac_mode <- if (!is.null(input$vacancies_mode) && nzchar(input$vacancies_mode)) {
-        tolower(input$vacancies_mode)
-      } else {
-        "latest"
-      }
-
-      pay_mode <- if (!is.null(input$payroll_mode) && nzchar(input$payroll_mode)) {
-        tolower(input$payroll_mode)
-      } else {
-        "latest"
-      }
-
-      calc_env$vacancies_mode <- vac_mode
-      calc_env$payroll_mode <- pay_mode
+      # Vacancies & payroll choices
+      labs <- period_labels()
+      calc_env$vacancies_mode <- mode_from_choice(input$vacancies_period, labs$vac)
+      calc_env$payroll_mode <- mode_from_choice(input$payroll_period, labs$payroll)
 
       incProgress(0.2, detail = "Step 4/6: Running calculations...")
 
@@ -842,22 +850,15 @@ server <- function(input, output, session) {
       incProgress(0.15, detail = "Step 3/6: Setting reference month...")
       Sys.sleep(0.2)
 
-      ref <- auto_ref()
-      if (!is.null(ref) && !is.null(ref$manual_month) && nzchar(ref$manual_month)) {
-        manual_month <<- ref$manual_month
+      mm <- reference_manual_month()
+      if (!is.null(mm) && nzchar(mm)) {
+        manual_month <<- tolower(mm)
       }
 
-      vacancies_mode <<- if (!is.null(input$vacancies_mode) && nzchar(input$vacancies_mode)) {
-        tolower(input$vacancies_mode)
-      } else {
-        "latest"
-      }
-
-      payroll_mode <<- if (!is.null(input$payroll_mode) && nzchar(input$payroll_mode)) {
-        tolower(input$payroll_mode)
-      } else {
-        "latest"
-      }
+      # Vacancies & payroll choices
+      labs <- period_labels()
+      vacancies_mode <<- mode_from_choice(input$vacancies_period, labs$vac)
+      payroll_mode <<- mode_from_choice(input$payroll_period, labs$payroll)
 
       incProgress(0.2, detail = "Step 4/6: Running calculations...")
 
@@ -933,11 +934,12 @@ server <- function(input, output, session) {
 
         incProgress(0.15, detail = "Step 6/6: Writing Word file...")
 
-        ref <- auto_ref()
-        month_override <- if (!is.null(ref) && !is.null(ref$manual_month) && nzchar(ref$manual_month)) ref$manual_month else NULL
-
-        vac_mode <- if (!is.null(input$vacancies_mode) && nzchar(input$vacancies_mode)) tolower(input$vacancies_mode) else NULL
-        pay_mode <- if (!is.null(input$payroll_mode) && nzchar(input$payroll_mode)) tolower(input$payroll_mode) else NULL
+        mm <- reference_manual_month()
+        labs <- period_labels()
+        vac_mode <- mode_from_choice(input$vacancies_period, labs$vac)
+        pay_mode <- mode_from_choice(input$payroll_period, labs$payroll)
+        both_mode <- if (identical(vac_mode, pay_mode)) vac_mode else NULL
+        month_override <- mm
 
         tryCatch({
           generate_word_output(
@@ -948,17 +950,7 @@ server <- function(input, output, session) {
             summary_path = summary_path,
             top_ten_path = top_ten_path,
             manual_month_override = month_override,
-            vacancies_mode_override = vac_mode,
-            payroll_mode_override = pay_mode,
-            verbose = FALSE
-          )
-        }, error = function(e) {
-          # Create error document
-          doc <- officer::read_docx()
-          doc <- officer::body_add_par(doc, "Error Generating Document", style = "heading 1")
-          doc <- officer::body_add_par(doc, paste("Error:", e$message))
-          print(doc, target = file)
-          showNotification(paste("Word error:", e$message), type = "error", duration = 5)
+            vac_payroll_mode_override = both_mode, type = "error", duration = 5)
         })
       })
 
@@ -997,13 +989,19 @@ server <- function(input, output, session) {
           }
 
           incProgress(0.5, detail = "Step 3/4: Building workbook (this may take a moment)...")
+          mm <- reference_manual_month()
+          labs <- period_labels()
+          vac_mode <- mode_from_choice(input$vacancies_period, labs$vac)
+          pay_mode <- mode_from_choice(input$payroll_period, labs$payroll)
+          month_override <- mm
           tmp_xlsx <- tempfile(fileext = ".xlsx")
           excel_env$create_audit_workbook(
             output_path = tmp_xlsx,
             calculations_path = calculations_path,
             config_path = config_path,
-            vacancies_mode = if (!is.null(input$vacancies_mode) && nzchar(input$vacancies_mode)) tolower(input$vacancies_mode) else "latest",
-            payroll_mode = if (!is.null(input$payroll_mode) && nzchar(input$payroll_mode)) tolower(input$payroll_mode) else "latest",
+            vacancies_mode = vac_mode,
+            payroll_mode = pay_mode,
+            manual_month_override = month_override,
             verbose = FALSE
           )
 

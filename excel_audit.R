@@ -603,10 +603,12 @@ build_dashboard_sheet <- function(wb, lfs_period_label, envir = parent.frame()) 
 # BUILD DATA SHEET WITH SUMMARY AND SOURCE DATA
 # ==============================================================================
 
+
 build_data_sheet <- function(wb, sheet_name, title, data, source_info = NULL,
                              label_type = "lfs", anchor_date = NULL,
                              covid_label = NULL, election_label = NULL,
-                             code_map = NULL) {
+                             code_map = NULL,
+                             alt_anchor_date = NULL, alt_label_type = NULL) {
 
   addWorksheet(wb, sheet_name)
 
@@ -648,25 +650,42 @@ build_data_sheet <- function(wb, sheet_name, title, data, source_info = NULL,
   writeData(wb, sheet_name, data, startRow = data_start, startCol = 1,
             colNames = TRUE, headerStyle = style_data_header)
 
-  # Summary section with formulas
-  summary_start <- 6
-  can_calc_summary <- !is.null(anchor_date)
+  # Shared helpers for summary blocks
+  find_data_row <- function(label) {
+    idx <- which(trimws(data$Date) == trimws(label))
+    if (length(idx) > 0) return(idx[1])
+    idx <- which(startsWith(trimws(data$Date), trimws(label)))
+    if (length(idx) > 0) return(idx[1])
+    NA
+  }
 
-  if (can_calc_summary) {
-    # Generate labels based on type
-    if (label_type == "lfs") {
+  to_excel_row <- function(data_idx) {
+    if (is.null(data_idx) || length(data_idx) == 0 || is.na(data_idx)) return(NA)
+    data_start + data_idx
+  }
+
+  # Summary section with formulas (support optional second block for alternate anchor)
+  summary_start <- 6
+
+  write_summary_block <- function(start_col, anchor_date, label_type, covid_label, election_label) {
+    if (is.null(anchor_date)) return(invisible(NULL))
+
+    lt <- label_type
+
+    # Labels based on type
+    if (lt == "lfs") {
       lab_cur <- make_lfs_label(anchor_date)
       lab_q <- make_lfs_label(anchor_date %m-% months(3))
       lab_y <- make_lfs_label(anchor_date %m-% months(12))
       lab_covid <- if (!is.null(covid_label)) covid_label else "Dec-Feb 2020"
       lab_election <- if (!is.null(election_label)) election_label else "Apr-Jun 2024"
-    } else if (label_type == "payroll") {
+    } else if (lt == "payroll") {
       lab_cur <- make_payroll_label(anchor_date)
       lab_q <- make_payroll_label(anchor_date %m-% months(3))
       lab_y <- make_payroll_label(anchor_date %m-% months(12))
       lab_covid <- if (!is.null(covid_label)) covid_label else "February 2020"
       lab_election <- if (!is.null(election_label)) election_label else "June 2024"
-    } else if (label_type == "ymd") {
+    } else if (lt == "ymd") {
       lab_cur <- make_ymd_label(anchor_date)
       lab_q <- make_ymd_label(anchor_date %m-% months(3))
       lab_y <- make_ymd_label(anchor_date %m-% months(12))
@@ -680,84 +699,89 @@ build_data_sheet <- function(wb, sheet_name, title, data, source_info = NULL,
       lab_election <- if (!is.null(election_label)) election_label else "2024-06-01 00:00:00"
     }
 
-    # Find data rows
-    find_data_row <- function(label) {
-      idx <- which(trimws(data$Date) == trimws(label))
-      if (length(idx) > 0) return(idx[1])
-      idx <- which(startsWith(trimws(data$Date), trimws(label)))
-      if (length(idx) > 0) return(idx[1])
-      NA
-    }
+    row_cur <- to_excel_row(find_data_row(lab_cur))
+    row_q <- to_excel_row(find_data_row(lab_q))
+    row_y <- to_excel_row(find_data_row(lab_y))
+    row_covid <- to_excel_row(find_data_row(lab_covid))
+    row_election <- to_excel_row(find_data_row(lab_election))
 
-    row_cur <- find_data_row(lab_cur)
-    row_q <- find_data_row(lab_q)
-    row_y <- find_data_row(lab_y)
-    row_covid <- find_data_row(lab_covid)
-    row_election <- find_data_row(lab_election)
-
-    to_excel_row <- function(data_idx) {
-      if (is.null(data_idx) || length(data_idx) == 0 || is.na(data_idx)) return(NA)
-      data_start + data_idx
-    }
-
-    excel_row_cur <- to_excel_row(row_cur)
-    excel_row_q <- to_excel_row(row_q)
-    excel_row_y <- to_excel_row(row_y)
-    excel_row_covid <- to_excel_row(row_covid)
-    excel_row_election <- to_excel_row(row_election)
-
-    # Summary header
-    writeData(wb, sheet_name, "Summary", startRow = summary_start, startCol = 1)
+    # Header
+    writeData(wb, sheet_name, "Summary", startRow = summary_start, startCol = start_col)
     for (i in seq_along(value_cols)) {
-      writeData(wb, sheet_name, value_cols[i], startRow = summary_start, startCol = i + 1)
+      writeData(wb, sheet_name, value_cols[i], startRow = summary_start, startCol = start_col + i)
     }
-    addStyle(wb, sheet_name, style_summary_header, rows = summary_start, cols = 1:(n_cols + 1), gridExpand = TRUE)
+    addStyle(wb, sheet_name, style_summary_header, rows = summary_start,
+             cols = start_col:(start_col + n_cols), gridExpand = TRUE)
 
-    # Summary rows
     summary_rows <- list(
-      list(label = paste0("Current (", lab_cur, ")"), comp_excel_row = NULL, is_current = TRUE),
-      list(label = paste0("Change on quarter (vs ", lab_q, ")"), comp_excel_row = excel_row_q, is_current = FALSE),
-      list(label = paste0("Change on year (vs ", lab_y, ")"), comp_excel_row = excel_row_y, is_current = FALSE),
-      list(label = paste0("Change since Covid (vs ", lab_covid, ")"), comp_excel_row = excel_row_covid, is_current = FALSE),
-      list(label = paste0("Change since election (vs ", lab_election, ")"), comp_excel_row = excel_row_election, is_current = FALSE)
+      list(label = paste0("Current (", lab_cur, ")"), comp_excel_row = NA, is_current = TRUE),
+      list(label = paste0("Change on quarter (vs ", lab_q, ")"), comp_excel_row = row_q, is_current = FALSE),
+      list(label = paste0("Change on year (vs ", lab_y, ")"), comp_excel_row = row_y, is_current = FALSE),
+      list(label = paste0("Change since Covid (vs ", lab_covid, ")"), comp_excel_row = row_covid, is_current = FALSE),
+      list(label = paste0("Change since election (vs ", lab_election, ")"), comp_excel_row = row_election, is_current = FALSE)
     )
 
     for (s in seq_along(summary_rows)) {
       row_num <- summary_start + s
       sr <- summary_rows[[s]]
 
-      writeData(wb, sheet_name, sr$label, startRow = row_num, startCol = 1)
+      writeData(wb, sheet_name, sr$label, startRow = row_num, startCol = start_col)
 
       if (s == 5) {
-        addStyle(wb, sheet_name, style_election_label, rows = row_num, cols = 1)
+        addStyle(wb, sheet_name, style_election_label, rows = row_num, cols = start_col)
       } else {
-        addStyle(wb, sheet_name, style_summary_label, rows = row_num, cols = 1)
+        addStyle(wb, sheet_name, style_summary_label, rows = row_num, cols = start_col)
       }
 
       for (i in seq_along(value_cols)) {
-        col_letter <- col_to_letter(i + 1)
+        col_letter <- col_to_letter(start_col + i)
 
         if (sr$is_current) {
-          if (!is.na(excel_row_cur)) {
-            formula <- paste0("=", col_letter, excel_row_cur)
-            writeFormula(wb, sheet_name, formula, startRow = row_num, startCol = i + 1)
+          if (!is.na(row_cur)) {
+            writeFormula(wb, sheet_name, paste0("=", col_letter, row_cur),
+                         startRow = row_num, startCol = start_col + i)
           }
         } else {
-          if (!is.na(excel_row_cur) && !is.na(sr$comp_excel_row)) {
-            formula <- paste0("=", col_letter, excel_row_cur, "-", col_letter, sr$comp_excel_row)
-            writeFormula(wb, sheet_name, formula, startRow = row_num, startCol = i + 1)
+          if (!is.na(row_cur) && !is.na(sr$comp_excel_row)) {
+            writeFormula(wb, sheet_name,
+                         paste0("=", col_letter, row_cur, "-", col_letter, sr$comp_excel_row),
+                         startRow = row_num, startCol = start_col + i)
           }
         }
-        addStyle(wb, sheet_name, style_summary_value, rows = row_num, cols = i + 1)
+        addStyle(wb, sheet_name, style_summary_value, rows = row_num, cols = start_col + i)
       }
     }
   }
 
-  # Column widths
+  # Primary summary block
+  if (!is.null(anchor_date)) {
+    write_summary_block(start_col = 1, anchor_date = anchor_date, label_type = label_type,
+                        covid_label = covid_label, election_label = election_label)
+  }
+
+  # Alternate summary block (side-by-side)
+  if (!is.null(alt_anchor_date)) {
+    alt_start <- n_cols + 4  # label col + metrics + 2-col gap
+    alt_lt <- if (!is.null(alt_label_type)) alt_label_type else label_type
+    write_summary_block(start_col = alt_start, anchor_date = alt_anchor_date, label_type = alt_lt,
+                        covid_label = covid_label, election_label = election_label)
+  }
+
+  # Column widths for main data columns
   setColWidths(wb, sheet_name, cols = 1, widths = 45)
   for (i in seq_along(value_cols)) {
     max_width <- max(nchar(as.character(value_cols[i])), 12, na.rm = TRUE)
     setColWidths(wb, sheet_name, cols = i + 1, widths = min(max_width + 2, 25))
+  }
+
+  # Column widths for alternate block (if present)
+  if (!is.null(alt_anchor_date)) {
+    alt_start <- n_cols + 4
+    setColWidths(wb, sheet_name, cols = alt_start, widths = 45)
+    for (i in seq_along(value_cols)) {
+      max_width <- max(nchar(as.character(value_cols[i])), 12, na.rm = TRUE)
+      setColWidths(wb, sheet_name, cols = alt_start + i, widths = min(max_width + 2, 25))
+    }
   }
 
   freezePane(wb, sheet_name, firstRow = TRUE, firstActiveRow = data_start + 1)
@@ -765,13 +789,6 @@ build_data_sheet <- function(wb, sheet_name, title, data, source_info = NULL,
 
   wb
 }
-
-# ==============================================================================
-# BUILD PAYROLL SHEET WITH 3 SUMMARY TABLES
-# ==============================================================================
-# Table 1: Current = latest month (e.g., December)
-# Table 2: Current = 3-month average ending at latest (Oct-Nov-Dec)
-# Table 3: Current = 3-month average ending at previous month (Sep-Oct-Nov)
 
 build_payroll_sheet <- function(wb, sheet_name, title, data, source_info = NULL,
                                 anchor_date = NULL, covid_label = "February 2020",
@@ -1027,6 +1044,7 @@ create_audit_workbook <- function(output_path,
                                   vacancies_mode = c("latest", "aligned"),
                                   payroll_mode = c("latest", "aligned"),
                                   vac_payroll_mode = NULL,
+                                  manual_month_override = NULL,
                                   verbose = TRUE) {
 
   if (verbose) message("=== Creating Labour Market Stats Workbook ===")
@@ -1034,20 +1052,22 @@ create_audit_workbook <- function(output_path,
 
   calc_env <- new.env()
 
-  if (file.exists(config_path)) {
+  # Set reference month (auto in Shiny; fallback to config if not supplied)
+  if (!is.null(manual_month_override) && nzchar(manual_month_override)) {
+    calc_env$manual_month <- tolower(manual_month_override)
+  } else if (file.exists(config_path)) {
     source(config_path, local = calc_env)
   }
 
-  # Pass vacancies/payroll mode into calculations if requested
-  # - legacy: vac_payroll_mode sets both
+  # Period modes (backwards compatible: vac_payroll_mode sets both)
   if (!is.null(vac_payroll_mode)) {
-    vac_payroll_mode <- match.arg(as.character(vac_payroll_mode), c("latest", "aligned"))
+    vac_payroll_mode <- match.arg(vac_payroll_mode, choices = c("latest", "aligned"))
     vacancies_mode <- vac_payroll_mode
     payroll_mode <- vac_payroll_mode
+  } else {
+    vacancies_mode <- match.arg(vacancies_mode)
+    payroll_mode <- match.arg(payroll_mode)
   }
-
-  vacancies_mode <- match.arg(vacancies_mode)
-  payroll_mode <- match.arg(payroll_mode)
 
   calc_env$vacancies_mode <- vacancies_mode
   calc_env$payroll_mode <- payroll_mode
@@ -1108,15 +1128,49 @@ create_audit_workbook <- function(output_path,
                          label_type = "payroll", anchor_date = payroll_anchor,
                          covid_label = "February 2020", election_label = "June 2024")
 
-  # 5. VACANCIES (Sheet "5" equivalent)
-  if (verbose) message("Building: 5 (Vacancies)...")
+  # 5. VACANCIES (Sheet "19" / A01 Vacancies)
+  if (verbose) message("Building: 19 (Vacancies)...")
   data <- tryCatch(fetch_vacancies_wide(), error = function(e) tibble())
-  wb <- build_data_sheet(wb, "5", "Job Vacancies",
+
+  # Determine both possible anchors from the vacancies data:
+  # - latest available (most recent period in DB)
+  # - aligned to the dashboard quarter (<= lfs_anchor)
+  parse_vac_end <- function(label) {
+    x <- trimws(as.character(label))
+    month_map <- c(jan=1,feb=2,mar=3,apr=4,may=5,jun=6,jul=7,aug=8,sep=9,oct=10,nov=11,dec=12)
+    months_found <- regmatches(x, gregexpr("[A-Za-z]{3}", x))[[1]]
+    year_found <- regmatches(x, gregexpr("[0-9]{4}", x))[[1]]
+    if (length(months_found) >= 2 && length(year_found) >= 1) {
+      end_month <- month_map[tolower(months_found[2])]
+      yr <- as.integer(year_found[1])
+      if (!is.na(end_month) && !is.na(yr)) return(as.Date(sprintf("%04d-%02d-01", yr, end_month)))
+    }
+    as.Date(NA)
+  }
+
+  vac_latest_anchor <- lfs_anchor
+  vac_aligned_anchor <- lfs_anchor
+
+  if (!is.null(data) && nrow(data) > 0 && "Date" %in% names(data)) {
+    end_dates <- as.Date(vapply(data$Date, parse_vac_end, as.Date(NA)), origin = "1970-01-01")
+    if (any(!is.na(end_dates))) {
+      vac_latest_anchor <- max(end_dates, na.rm = TRUE)
+      # aligned = latest end_date <= lfs_anchor (else fallback to latest)
+      aligned_candidates <- end_dates[!is.na(end_dates) & end_dates <= lfs_anchor]
+      vac_aligned_anchor <- if (length(aligned_candidates) >= 1) max(aligned_candidates) else vac_latest_anchor
+    }
+  }
+
+  vac_selected <- if (vacancies_mode == "latest") vac_latest_anchor else vac_aligned_anchor
+  vac_other <- if (vacancies_mode == "latest") vac_aligned_anchor else vac_latest_anchor
+
+  wb <- build_data_sheet(wb, "19", "Job Vacancies",
                          data, "labour_market__vacancies_business",
-                         label_type = "lfs", anchor_date = lfs_anchor,
+                         label_type = "lfs", anchor_date = vac_selected,
+                         alt_anchor_date = vac_other,
                          covid_label = "Jan-Mar 2020", election_label = "Apr-Jun 2024")
 
-  # 6. REDUNDANCY (Sheet "10" equivalent)
+# 6. REDUNDANCY (Sheet "10" equivalent)
   if (verbose) message("Building: 10 (Redundancies)...")
   data <- tryCatch(fetch_redundancy_wide(), error = function(e) tibble())
   wb <- build_data_sheet(wb, "10", "LFS Redundancy Rate",
